@@ -23,15 +23,19 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "three": "^0.169.0"
-  },
-  "dependencies": {
+    "three": "^0.169.0",
     "puppeteer-core": "^24.0.0"
   },
   "devDependencies": {
     "@types/three": "^0.169.0",
     "three": "^0.169.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "puppeteer-core": "^24.0.0"
+  },
+  "peerDependenciesMeta": {
+    "puppeteer-core": {
+      "optional": true
+    }
   }
 }

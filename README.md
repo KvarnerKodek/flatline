@@ -69,3 +69,13 @@ npm install
 npm run typecheck
 npm test
 ```
+
+## Use it from a project
+
+```sh
+npm install github:KvarnerKodek/flatline#<commit>
+```
+
+Import from the package root or any module path, for example `flatline/toon`, `flatline/water`, `flatline/hud`.
+The renderer CLI needs `puppeteer-core` (optional peer) and ffmpeg. The film in `sentinel/sites/korsar-demo` is the
+reference consumer: it keeps only film-specific code (vessel model, harbour, script, sonar) and imports the rest.
