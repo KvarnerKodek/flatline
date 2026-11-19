@@ -43,3 +43,4 @@ html,body{height:100%;background:var(--ink);color:var(--fg);overflow:hidden;font
 
 body.render .bar{display:none}
 #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--ink);font:500 11px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--mute);z-index:5}
+body:not(.render) #hud::before,body.render #hud::before{content:'';position:fixed;left:0;right:0;bottom:0;height:46%;background:linear-gradient(0deg,rgba(3,10,18,.62),rgba(3,10,18,.28) 55%,transparent);pointer-events:none}
