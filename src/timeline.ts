@@ -81,3 +81,27 @@ export function checkScript(films: Pick<Film<unknown>, 'duration' | 'captions' |
   if (ch.length && ch[ch.length - 1].t >= films.duration) out.push('the last chapter starts after the film ends');
   return out;
 }
+
+/** Trapezoid ease: ramps up, holds a constant rate, ramps down. Goes 0 to 1 over s in [0, 1]. */
+export const trapezoid = (s: number, ramp = 0.22) => {
+  const v = 1 / (1 - ramp);
+  if (s <= ramp) return (v * s * s) / (2 * ramp);
+  if (s >= 1 - ramp) return 1 - (v * (1 - s) * (1 - s)) / (2 * ramp);
+  return (v * ramp) / 2 + v * (s - ramp);
+};
+
+/**
+ * Maps playback time to film time. `segments` replace a stretch of playback with a different stretch of
+ * film time (slow motion when the playback span is longer, a cut when the film span is skipped).
+ */
+export function timeWarp(segments: { from: number; to: number; filmFrom: number; filmTo: number }[]) {
+  return (t: number) => {
+    let off = 0;
+    for (const s of segments) {
+      if (t < s.from) break;
+      if (t < s.to) return s.filmFrom + ((t - s.from) * (s.filmTo - s.filmFrom)) / (s.to - s.from);
+      off = s.filmTo - s.to;
+    }
+    return t + off;
+  };
+}

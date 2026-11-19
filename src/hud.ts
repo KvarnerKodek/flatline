@@ -35,8 +35,8 @@ export class Hud {
   pip = el('div', 'pip', '<span>Thermal</span><em>LWIR · tracking</em>');
 
 
-  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void) {
-    this.root.append(this.chap, this.pip);
+  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void, brand?: string) {
+    this.root.append(...(brand ? [el('div', 'mark', brand)] : []), this.chap, this.pip);
     this.pip.style.opacity = '0';
     for (const c of captions) {
       const e = el('div', 'cap', `<div class="k">${c.k}</div><h2>${c.h}</h2>${c.p ? `<p>${c.p}</p>` : ''}`);
@@ -55,6 +55,18 @@ export class Hud {
       tl.style.left = x + '%';
       scrub.append(tick, tl);
     }
+    const labels = [...scrub.querySelectorAll<HTMLElement>('.tl')];
+    const declutter = () => {
+      let edge = -Infinity;
+      for (const l of labels) {
+        l.style.visibility = 'visible';
+        const r = l.getBoundingClientRect();
+        if (r.left < edge + 8) l.style.visibility = 'hidden';
+        else edge = r.right;
+      }
+    };
+    addEventListener('resize', declutter);
+    requestAnimationFrame(declutter);
     const seekFrom = (ev: PointerEvent) => {
       const r = scrub.getBoundingClientRect();
       onSeek(Math.min(0.999, Math.max(0, (ev.clientX - r.left) / r.width)) * duration);
@@ -83,7 +95,7 @@ export class Hud {
     }
     let ch = this.chapters[0];
     for (const c of this.chapters) if (t >= c.t) ch = c;
-    this.chap.innerHTML = `<b>${String(this.chapters.indexOf(ch) + 1).padStart(2, '0')}</b> · ${ch.name}`;
+    this.chap.textContent = ch.name;
     this.fill.style.width = (t / this.duration) * 100 + '%';
 
     const seen = new Set<string>();

@@ -8,16 +8,26 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./style.css": "./src/flatline.css"
+    "./style.css": "./src/flatline.css",
+    "./*": "./src/*.ts"
   },
-  "bin": { "flatline-render": "bin/render.mjs" },
-  "files": ["src", "bin"],
+  "bin": {
+    "flatline-render": "bin/render.mjs"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "peerDependencies": { "three": "^0.169.0" },
-  "dependencies": { "puppeteer-core": "^24.0.0" },
+  "peerDependencies": {
+    "three": "^0.169.0"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  },
   "devDependencies": {
     "@types/three": "^0.169.0",
     "three": "^0.169.0",

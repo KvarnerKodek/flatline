@@ -4,8 +4,8 @@ import { G, COMMON } from './toon';
 export interface Obstacle { x: number; z: number; r: number; h: number }
 
 const N = 46;
-const CELL = 6.4;
-const RANGE = (N * CELL) / 2;
+const CELL0 = 6.4;
+const RANGE0 = (N * CELL0) / 2;
 
 const VS = /* glsl */ `
 attribute vec4 iCol; varying vec4 vC; varying vec3 vN; varying vec3 vW;
@@ -58,7 +58,7 @@ export class Occupancy {
       this.group.add(ring);
       this.rings.push(ring);
     }
-    const sg = new THREE.RingGeometry(1, RANGE * 1.1, 48, 1, 0, 0.9);
+    const sg = new THREE.RingGeometry(1, RANGE0 * 1.1, 48, 1, 0, 0.9);
     this.sweep = new THREE.Mesh(sg, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
@@ -79,7 +79,11 @@ export class Occupancy {
     this.group.add(this.path);
   }
 
-  update(t: number, hx: number, hz: number, heading: number, obs: Obstacle[], reveal: number, show: number) {
+  plan: THREE.Vector3[] | null = null;
+
+  update(t: number, hx: number, hz: number, heading: number, obs: Obstacle[], reveal: number, show: number, cell = CELL0) {
+    const CELL = cell, RANGE = (N * cell) / 2, k = cell / CELL0;
+    this.k = k;
     this.group.visible = show > 0.001;
     if (!this.group.visible) return;
     const ox = Math.round(hx / CELL) * CELL, oz = Math.round(hz / CELL) * CELL;
@@ -130,36 +134,27 @@ export class Occupancy {
     this.group.children.forEach((c) => { if (this.rings.includes(c as THREE.Mesh)) c.position.set(hx, tOffY, hz); });
     for (const rg of this.rings) { (rg.material as THREE.MeshBasicMaterial).opacity = 0.4 * show * Math.min(1, reveal * 2); rg.position.set(hx, 1.08, hz); }
     this.sweep.position.set(hx, 1.12, hz);
+    this.sweep.scale.setScalar(k);
+    for (const rg of this.rings) rg.scale.setScalar(k);
     this.sweep.rotation.z = t * 2.6;
     (this.sweep.material as THREE.ShaderMaterial).visible = reveal < 0.995 || show > 0.2;
     this.buildPath(hx, hz, heading, obs, t);
   }
 
+  route: (x: number) => number = () => 0;
+  private k = 1;
+
   private buildPath(hx: number, hz: number, heading: number, obs: Obstacle[], t: number) {
-    const pts: THREE.Vector3[] = [];
-    let x = hx, z = hz, a = heading;
-    let lat = 0;
-    for (let s = 0; s < 46; s++) {
-      let steer = 0;
-      for (const o of obs) {
-        const ox = o.x - x, oz = o.z - z;
-        const d = Math.hypot(ox, oz);
-        if (d < o.r + 34 && d > 1) {
-          const f = Math.cos(a) * oz - Math.sin(a) * ox;
-          const ahead = ox * Math.cos(a) + oz * Math.sin(a);
-          if (ahead > -o.r) steer += (f > 0 ? -1 : 1) * (1 - d / (o.r + 34)) * 0.5;
-        }
-      }
-      lat = lat * 0.8 + steer * 0.6;
-      a += lat * 0.35 + (heading - a) * 0.02;
-      x += Math.cos(a) * 5; z += Math.sin(a) * 5;
-      pts.push(new THREE.Vector3(x, 1.2, z));
+    const pts: THREE.Vector3[] = this.plan ? this.plan.map((p) => p.clone()) : [];
+    if (!this.plan) for (let s = 0; s < 46; s++) {
+      const x = hx + s * 5;
+      pts.push(new THREE.Vector3(x, 1.2, this.route(x)));
     }
     const pos: number[] = [], u: number[] = [], idx: number[] = [];
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i], q = pts[Math.min(i + 1, pts.length - 1)], r = pts[Math.max(i - 1, 0)];
       const dx = q.x - r.x, dz = q.z - r.z, l = Math.hypot(dx, dz) || 1;
-      const nx = -dz / l, nz = dx / l, w = 1.0 + (1 - i / pts.length) * 0.4;
+      const nx = -dz / l, nz = dx / l, w = (1.0 + (1 - i / pts.length) * 0.4) * this.k;
       pos.push(p.x + nx * w, p.y, p.z + nz * w, p.x - nx * w, p.y, p.z - nz * w);
       u.push(i / pts.length, i / pts.length);
       if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }

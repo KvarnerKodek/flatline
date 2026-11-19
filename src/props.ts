@@ -58,13 +58,13 @@ export class Mesher {
   }
 }
 
-export interface Station { t: number; w: number; d: number; y: number }
+interface Station { t: number; w: number; d: number; y: number }
 
-export function hullLoft(m: Mesher, L: number, beam: number, depth: number, deckY: number, st: Station[], hullC: THREE.Vector3, deckC: THREE.Vector3, stripeC: THREE.Vector3) {
+function hullLoft(m: Mesher, L: number, beam: number, depth: number, deckY: number, st: Station[], hullC: THREE.Vector3, deckC: THREE.Vector3, stripeC: THREE.Vector3) {
   const N = 7;
   m.c = new THREE.Vector3(0, 0, 0);
-  const rings: THREE.Vector3[][] = st.map((s) => {
-    const hw = (beam / 2) * s.w, dp = depth * s.d, top = deckY + s.y, x = (s.t - 0.5) * L;
+  const rings: THREE.Vector3[][] = st.slice().reverse().map((s) => {
+    const hw = (beam / 2) * s.w, dp = depth * s.d, top = deckY + s.y, x = (0.5 - s.t) * L;
     const r: THREE.Vector3[] = [];
     for (let i = 0; i <= N; i++) {
       const a = (i / N) * Math.PI;
@@ -98,7 +98,7 @@ export function finish(m: Mesher, mat: THREE.ShaderMaterial = MAT): THREE.Group 
   return g;
 }
 
-export interface Craft { root: THREE.Group; lamps: THREE.Sprite[]; length: number }
+export interface Craft { root: THREE.Group; lamps: THREE.Sprite[]; length: number; rig?: THREE.Group }
 
 const FISH_ST: Station[] = [
   { t: 0, w: 0.08, d: 0.45, y: 0.55 }, { t: 0.15, w: 0.62, d: 0.8, y: 0.38 }, { t: 0.4, w: 0.98, d: 1, y: 0.18 },
@@ -128,7 +128,7 @@ export function fishingBoat(hullColor = 0x2b3b52, cabin = 0xd8dde4): Craft {
   return { root: wrap(root), lamps: [], length: L };
 }
 
-export function sailboat(sail = 0xf5f1e4, hullC = 0xf0efe9, lights = true, sailC2 = 0xe8e2d0): Craft {
+export function sailboat(sail = 0xf5f1e4, hullC = 0xf0efe9, lights = true, sailC2 = 0xe8e2d0, furled = false): Craft {
   const m = new Mesher();
   const L = 11;
   hullLoft(m, L, 3.4, 1.7, 0.7, SAIL_ST, hex(hullC), hex(0xc9b08a), hex(0x2c4a7c));
@@ -140,17 +140,41 @@ export function sailboat(sail = 0xf5f1e4, hullC = 0xf0efe9, lights = true, sailC
   sm.c = null;
   const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
   sm.tri(V(0.45, 1.7, 0.05), V(0.45, 14.2, 0.05), V(-4.4, 1.7, 0.4), hex(sail));
-  sm.tri(V(0.7, 2.0, -0.04), V(0.7, 13.0, -0.04), V(5.3, 1.8, -0.5), hex(sailC2));
+  if (!furled) sm.tri(V(0.7, 2.0, -0.04), V(0.7, 13.0, -0.04), V(5.3, 1.8, -0.5), hex(sailC2));
   const sails = finish(sm, MAT_SAIL);
+  const rig = new THREE.Group();
+  rig.position.set(0.55, 0, 0);
+  sails.position.set(-0.55, 0, 0);
+  rig.add(sails);
   const w = new THREE.Group();
-  w.add(root, sails);
+  w.add(root, rig);
+  if (furled) {
+    const bow = new THREE.Vector3(5.35, 1.0, 0), head = new THREE.Vector3(0.7, 13.6, 0);
+    const dir = head.clone().sub(bow), len = dir.length(), ang = Math.atan2(-dir.x, dir.y);
+    const piece = (r: number, t0: number, t1: number, c: number) => {
+      const g = new THREE.CylinderGeometry(r, r, len * (t1 - t0), 10);
+      const cc = hex(c), n = g.getAttribute('position').count, cols: number[] = [];
+      for (let i = 0; i < n; i++) cols.push(cc.x, cc.y, cc.z);
+      g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+      g.rotateZ(ang);
+      const m = (t0 + t1) / 2;
+      g.translate(bow.x + dir.x * m, bow.y + dir.y * m, 0);
+      w.add(new THREE.Mesh(g, MAT), new THREE.Mesh(g, INK));
+    };
+    piece(0.2, 0, 0.05, 0x59626c);
+    piece(0.15, 0.05, 0.84, sailC2);
+    piece(0.03, 0.84, 1, 0x59626c);
+    const fit = new Mesher();
+    fit.box(5.4, 0.85, 0, 0.5, 0.3, 0.5, hex(0x59626c));
+    w.add(finish(fit));
+  }
   const lamps: THREE.Sprite[] = [];
   if (lights) {
     const mk = (c: number, x: number, y: number, z: number, s = 1.3) => { const l = glow(c, s, 0.95); l.position.set(x, y, z); w.add(l); lamps.push(l); };
     mk(0xff3b30, 4.2, 1.1, -1.4); mk(0x30e07a, 4.2, 1.1, 1.4); mk(0xfff3d0, 0.6, 14.6, 0, 1.6);
     mk(0xfff3d0, -5.2, 1.4, 0, 1.0);
   }
-  return { root: wrap(w), lamps, length: L };
+  return { root: wrap(w), lamps, length: L, rig };
 }
 
 export function motorBoat(hullC = 0xf4f4f0, accent = 0x1d6fa8, lights = false): Craft {
