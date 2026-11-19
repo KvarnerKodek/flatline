@@ -57,14 +57,14 @@ export function makeSky(): THREE.Group {
           // painted clouds: streaky bands with a lit rim toward the light
           if (d.y > .0) {
             vec2 p = d.xz/(d.y+.3);
-            p = p*vec2(.34,.62) + vec2(uTime*.003, 0.);
+            p = p*vec2(.5,.55) + vec2(uTime*.003, 0.);
             vec2 w = vec2(fbm(p*1.7+3.), fbm(p*1.7));
             float n = fbm(p + .55*w);
             vec2 lo = normalize(ld.xz+1e-3)*.045;
             float n2 = fbm(p + lo + .55*w);
             float cov = smoothstep(.02,.22,d.y)*(1.-smoothstep(.55,.95,d.y));
-            float body = smoothstep(uCover, uCover+.02, n);
-            float inner = smoothstep(uCover, uCover+.02, n2);
+            float body = smoothstep(uCover+.05, uCover+.1, n);
+            float inner = smoothstep(uCover+.05, uCover+.1, n2);
             float rim = body*(1.-inner);
             vec3 base = mix(col, uCloudShade, .78);
             vec3 cc = mix(base, uCloud, rim);

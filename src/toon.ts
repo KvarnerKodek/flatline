@@ -64,6 +64,7 @@ void main(){
   vec3 shade = base*(uShadow*(.7+.3*hemi)+uAmb*.22);
   vec3 mid = base*(uAmb*.5+uLightCol*.42);
   vec3 lit = base*(uAmb*.3+uLightCol*.78);
+  float ex = 1.-.34*uNight; mid *= ex; lit *= ex; shade *= 1.-.2*uNight;
   vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
   float rim = pow(1.-max(dot(n,v),0.),3.);
   col += uRim*smoothstep(.5,.58,rim)*(.25+.75*hemi)*.55;
