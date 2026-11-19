@@ -26,7 +26,7 @@ export class Hud {
   root = document.getElementById('hud')!;
   ui = document.getElementById('ui')!;
   private caps: { c: Caption; e: HTMLElement }[] = [];
-  private pool = new Map<string, { b: HTMLElement; tag: HTMLElement; lead: HTMLElement }>();
+  private pool = new Map<string, { b: HTMLElement; tag: HTMLElement; lead: HTMLElement; w: number }>();
   private chap = el('div', 'chap');
   private v = new THREE.Vector3();
   private bar = el('div', 'bar');
@@ -107,7 +107,7 @@ export class Hud {
         const tag = el('div', 'tag');
         const lead = el('div', 'lead');
         this.root.append(lead, b, tag);
-        n = { b, tag, lead };
+        n = { b, tag, lead, w: 0 };
         this.pool.set(tr.id, n);
       }
       this.v.copy(tr.pos).project(cam);
@@ -116,9 +116,10 @@ export class Hud {
       const sc = (1.9 - 0.9 * Math.min(1, tr.lock * 1.4)) * tr.size;
       const o = vis ? Math.min(1, tr.lock * 2.5) : 0;
       n.b.style.cssText = `--c:${tr.color};opacity:${o};transform:translate(${x}px,${y}px) scale(${sc}) rotate(${(1 - tr.lock) * 45}deg)`;
-      const tx = x + (tr.dx ?? tr.size * 46), ty = y + (tr.dy ?? -tr.size * 56);
+      const html = `<b>${tr.title}</b>${tr.lines.join('<br>')}`;
+      if (n.tag.innerHTML !== html) { n.tag.innerHTML = html; n.w = n.tag.offsetWidth; }
+      const tx = Math.min(Math.max(x + (tr.dx ?? tr.size * 46), 8), Math.max(8, w - (n.w ?? 0) - 8)), ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), 48), h * 0.62);
       n.tag.style.cssText = `--c:${tr.color};opacity:${o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3))};transform:translate(${tx}px,${ty}px)`;
-      n.tag.innerHTML = `<b>${tr.title}</b>${tr.lines.join('<br>')}`;
       const lx = tx - 4, ly = ty + 14, dx = x - lx, dy = y - ly;
       n.lead.style.cssText = `--c:${tr.color};opacity:${o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3)) * 0.8};width:${Math.hypot(dx, dy) * 0.6}px;transform:translate(${lx}px,${ly}px) rotate(${Math.atan2(dy, dx)}rad)`;
     }
