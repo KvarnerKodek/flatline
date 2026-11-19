@@ -1,0 +1,27 @@
+{
+  "name": "flatline",
+  "version": "0.1.0",
+  "description": "Cel-shaded procedural films for the web and for video. A film is a pure function of time.",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./style.css": "./src/flatline.css"
+  },
+  "bin": { "flatline-render": "bin/render.mjs" },
+  "files": ["src", "bin"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": { "three": "^0.169.0" },
+  "dependencies": { "puppeteer-core": "^24.0.0" },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "three": "^0.169.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

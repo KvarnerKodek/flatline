@@ -1,0 +1,83 @@
+import * as THREE from 'three';
+import type { Caption, Chapter, TrackSpec } from './hud';
+
+export type { Caption, Chapter, TrackSpec };
+
+export const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+export const ss = (a: number, b: number, x: number) => {
+  const t = clamp((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+export const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+export const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+
+export interface CameraShot {
+  p: THREE.Vector3;
+  look: THREE.Vector3;
+  fov: number;
+}
+
+/** Everything the player needs to draw one instant of a film. */
+export interface Frame {
+  cam: CameraShot;
+  /** 0 clear, 1 black. */
+  fade: number;
+  /** 0 day, 1 night; steers bloom and grade. */
+  night: number;
+  tracks: TrackSpec[];
+}
+
+export const newFrame = (): Frame => ({ cam: { p: V(), look: V(), fov: 40 }, fade: 0, night: 0, tracks: [] });
+
+/** Slide the camera and its target sideways so the subject sits off-centre, clear of captions. */
+export function shiftCamera(c: CameraShot, metres: number) {
+  if (!metres) return;
+  const fwd = V().subVectors(c.look, c.p).normalize();
+  const right = V().crossVectors(fwd, V(0, 1, 0)).normalize().multiplyScalar(metres);
+  c.p.add(right);
+  c.look.add(right);
+}
+
+/**
+ * A film is a pure function of time: `frame(world, t)` places everything and returns the camera.
+ * That is what makes scrubbing, seeking and frame-exact video rendering possible.
+ */
+export interface Film<W> {
+  duration: number;
+  captions: Caption[];
+  chapters: Chapter[];
+  /** Everything the world needs from the network or the GPU before the first frame. */
+  load(base: string): Promise<W>;
+  scene(world: W): THREE.Scene;
+  /** Objects re-centred on the camera every frame, such as the sky dome and the sea. */
+  follow?(world: W): THREE.Object3D[];
+  frame(world: W, t: number): Frame;
+  /** Optional extra drawing straight onto the canvas after post-processing, for inset views. */
+  afterPost?(world: W, t: number, ctx: AfterPost): void;
+}
+
+export interface AfterPost {
+  renderer: THREE.WebGLRenderer;
+  camera: THREE.PerspectiveCamera;
+  width: number;
+  height: number;
+  hud: { pip: HTMLElement };
+}
+
+/** Problems a script can have that no render will reveal until someone watches the whole film. */
+export function checkScript(films: Pick<Film<unknown>, 'duration' | 'captions' | 'chapters'>, minCaption = 4): string[] {
+  const out: string[] = [];
+  const caps = [...films.captions].sort((a, b) => a.t0 - b.t0);
+  caps.forEach((c, i) => {
+    if (c.t0 < 0 || c.t1 > films.duration) out.push(`caption "${c.h}" leaves the film`);
+    if (c.t1 - c.t0 < minCaption) out.push(`caption "${c.h}" is shorter than ${minCaption} s`);
+    if (i && c.t0 < caps[i - 1].t1) out.push(`caption "${c.h}" overlaps "${caps[i - 1].h}"`);
+    if (/[—–]/.test(`${c.k}${c.h}${c.p ?? ''}`)) out.push(`caption "${c.h}" contains a dash character`);
+  });
+  const ch = films.chapters;
+  if (!ch.length || ch[0].t !== 0) out.push('chapters must start at 0');
+  ch.forEach((c, i) => { if (i && c.t <= ch[i - 1].t) out.push(`chapter "${c.name}" is out of order`); });
+  if (ch.length && ch[ch.length - 1].t >= films.duration) out.push('the last chapter starts after the film ends');
+  return out;
+}
