@@ -115,9 +115,9 @@ export function makeWater(): THREE.Mesh {
         // glitter path toward the light: soft streaks quantised to two levels
         vec3 r = reflect(-v, n);
         float s = max(dot(r, uLightDir), 0.);
-        float g1 = smoothstep(.986,.9985,s)*(.5+.5*vnoise(p*1.1+uTime*.3));
+        float g1 = smoothstep(.986-.004*uNight,.9985,s)*(.5+.5*vnoise(p*1.1+uTime*.3));
         float glint = step(.5,g1)*.3 + step(.84,g1)*.35;
-        col += uSunCol*glint*.9*smoothstep(10.,90.,dist);
+        col += uSunCol*glint*(.9+.45*uNight)*smoothstep(10.,90.,dist);
         // crest strokes: thin drawn foam marks on the higher swells
         float hn = vH/(.5*max(uSea,.3));
         float rd = 1.-abs(2.*vnoise(p*vec2(.8,1.35)+vec2(uTime*.18,-uTime*.05))-1.);
