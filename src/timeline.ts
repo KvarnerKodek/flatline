@@ -4,6 +4,7 @@ import type { SunShadow } from './shadow';
 import type { Grade } from './post';
 import type { Look } from './look';
 import type { Score } from './score';
+import type { Sound } from './soundtrack';
 
 export type { Caption, Chapter, TrackSpec };
 
@@ -63,6 +64,8 @@ export interface Film<W> {
   warp?(t: number): number;
   /** The film's music, written as notes; the player plays it in sync and the renderer muxes it into the video. */
   score?(): Score;
+  /** Another way to supply sound, such as `new CuePlayer(generateCues(spec), duration)`; wins over `score`. */
+  sound?(): Sound;
   /** Sun shadows to draw before each frame; aim them from `frame`. */
   sun?(world: W): SunShadow;
   /** How the film is drawn: shading, linework, painterly texture, haze and grade. `GHIBLI` or `CEL`, or your own. */

@@ -152,6 +152,14 @@ export function wav(L: Float32Array, R: Float32Array, rate = 44100): ArrayBuffer
   return buf;
 }
 
+/** Base64 of a binary buffer, for handing a WAV to the video renderer. */
+export function wavBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
 const NAMES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 /** MIDI number of a note name such as `C4`, `F#3` or `Bb5`. */
 export function midi(name: string): number {
