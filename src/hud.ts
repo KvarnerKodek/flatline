@@ -11,6 +11,9 @@ const el = (tag: string, cls?: string, html?: string) => {
   return e;
 };
 
+/** How tracked objects are marked: lock-on corner brackets with a leader line (the original), or just the tag. */
+export interface HudOptions { markers?: 'brackets' | 'none' }
+
 export interface TrackSpec {
   id: string;
   pos: THREE.Vector3;
@@ -36,7 +39,8 @@ export class Hud {
   pip = el('div', 'pip', '<span>Thermal</span><em>LWIR · tracking</em>');
 
 
-  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void, brand?: string) {
+  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void, brand?: string, opts: HudOptions = {}) {
+    if (opts.markers === 'none') this.root.classList.add('nomarkers');
     this.root.append(...(brand ? [el('div', 'mark', brand)] : []), this.chap, this.pip);
     this.pip.style.opacity = '0';
     for (const c of captions) {
@@ -86,7 +90,7 @@ export class Hud {
     wake();
   }
 
-  setPlaying(p: boolean) { this.playBtn.textContent = p ? 'Pause' : 'Play'; }
+  setPlaying(p: boolean) { this.playBtn.textContent = p ? 'Pause' : 'Play'; this.playBtn.classList.toggle('playing', p); this.playBtn.setAttribute('aria-label', p ? 'Pause' : 'Play'); }
 
   update(t: number, tracks: TrackSpec[], cam: THREE.PerspectiveCamera, w: number, h: number) {
     for (const { c, e } of this.caps) {
@@ -122,7 +126,7 @@ export class Hud {
       const html = `<b>${tr.title}</b>${tr.lines.join('<br>')}`;
       if (n.tag.innerHTML !== html) { n.tag.innerHTML = html; n.w = n.tag.offsetWidth; }
       const tx = Math.min(Math.max(x + (tr.dx ?? tr.size * 46), 8), Math.max(8, w - (n.w ?? 0) - 8));
-      let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), 48), h * 0.62);
+      let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), Math.min(116, h * 0.2)), h * 0.55);
       const shown = o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3));
       if (shown > 0.05) {
         for (const p of placed) if (tx < p.x + p.w + 6 && p.x < tx + (n.w ?? 0) + 6 && Math.abs(ty - p.y) < TAG_H) ty = p.y + (ty >= p.y ? TAG_H : -TAG_H);

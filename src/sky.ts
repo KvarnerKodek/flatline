@@ -74,7 +74,7 @@ export function makeSky(): THREE.Group {
         }`,
     }),
   );
-  sky.renderOrder = -10;
+  sky.renderOrder = -10; sky.userData.noEdge = true;
   sky.frustumCulled = false;
   root.add(sky);
 
@@ -117,7 +117,7 @@ export function makeSky(): THREE.Group {
         }`,
     }));
     mesh.frustumCulled = false;
-    mesh.renderOrder = -9;
+    mesh.renderOrder = -9; mesh.userData.noEdge = true;
     ridges.push({ m: mesh, haze: L.haze });
     root.add(mesh);
   }

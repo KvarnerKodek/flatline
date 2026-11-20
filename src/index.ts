@@ -21,3 +21,5 @@ export * from './figure';
 export * from './motes';
 export * from './track';
 export * from './shadow';
+export * from './look';
+export * from './edges';

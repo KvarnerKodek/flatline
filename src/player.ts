@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { G } from './toon';
 import { Post } from './post';
 import { Hud } from './hud';
+import type { HudOptions } from './hud';
+import { applyLook } from './look';
 import type { Film } from './timeline';
 import './flatline.css';
 
@@ -16,6 +18,19 @@ function ensure(id: string, tag = 'div', text?: string): HTMLElement {
     document.body.append(e);
   }
   return e;
+}
+
+/**
+ * Optional look for the page chrome. flatline's own styles stay the default; a theme only adds a class to
+ * `<body>` (so a host stylesheet can scope its rules to it) and sets CSS custom properties on `:root`.
+ */
+export interface Theme { className?: string; vars?: Record<string, string> }
+export interface PlayOptions { hud?: HudOptions; theme?: Theme; fallback?: () => void; brand?: string; base?: string }
+
+export function applyTheme(theme?: Theme) {
+  if (!theme) return;
+  if (theme.className) document.body.classList.add(...theme.className.split(/\s+/).filter(Boolean));
+  for (const [k, v] of Object.entries(theme.vars ?? {})) document.documentElement.style.setProperty(k, v);
 }
 
 export interface Player { seek(t: number): void; readonly duration: number }
@@ -33,7 +48,10 @@ declare global {
  * Embed protocol (same origin): the page posts {source:'flatline',type:'ready'|'ended'|'dismiss'} to its parent and
  * accepts {source:'flatline-host',type:'start'|'stop',t?}. `film.endCard` shows an overlay, then reports 'ended'.
  */
-export async function play<W>(film: Film<W>, base = './', fallback?: () => void, brand?: string): Promise<Player> {
+export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions = './', fallbackArg?: () => void, brandArg?: string): Promise<Player> {
+  const opts: PlayOptions = typeof baseOrOptions === 'string' ? { base: baseOrOptions, fallback: fallbackArg, brand: brandArg } : baseOrOptions;
+  const base = opts.base ?? './', fallback = opts.fallback, brand = opts.brand;
+  applyTheme(opts.theme);
   const q = new URLSearchParams(location.search);
   const canvas = ensure('gl', 'canvas') as HTMLCanvasElement;
   ensure('hud'); ensure('ui'); ensure('boot', 'div', 'Loading');
@@ -48,7 +66,8 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 22000);
   const world = await film.load(base);
   const scene = film.scene(world);
-  const post = new Post(renderer, scene, camera);
+  if (film.look) applyLook(film.look);
+  const post = new Post(renderer, scene, camera, { ...film.look?.grade, ...film.grade }, { edges: film.look?.edges, haze: film.look?.haze });
   const render3d = q.has('render');
   const embed = q.has('embed');
   if (render3d) document.body.classList.add('render');
@@ -75,7 +94,7 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
   let t = parseFloat(q.get('t') ?? (reduced ? String(film.duration * 0.4) : '0'));
   let playing = !reduced && !q.has('still') && !embed;
   const toggle = () => { if (t >= film.duration) t = 0; playing = !playing; hud.setPlaying(playing); };
-  const hud = new Hud(film.captions, film.chapters, film.duration, toggle, (s) => { t = s; }, brand);
+  const hud = new Hud(film.captions, film.chapters, film.duration, toggle, (s) => { t = s; }, brand, opts.hud);
   hud.setPlaying(playing);
   const say = (type: string) => { if (embed) parent.postMessage({ source: 'flatline', type }, location.origin); };
   let card: HTMLElement | undefined, announced = false;
@@ -114,7 +133,7 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
     hud.update(t, f.tracks, camera, W, Hh);
     scene.updateMatrixWorld();
     sun?.render(renderer, scene);
-    post.render(now / 1000, f.fade, f.night, f.flash ?? 0);
+    post.render(t, f.fade, f.night, f.flash ?? 0);
     if (card && film.endCard) {
       const ca = Math.min(1, Math.max(0, (t - film.endCard.at + 1.2) / 1.8));
       card.style.opacity = String(ca);
