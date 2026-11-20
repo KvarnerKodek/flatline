@@ -29,7 +29,8 @@ const film: Film<World> = {
 play(film);
 ```
 
-URL switches: `?t=40` start time, `?still` render one frame, `?render` hide the controls.
+URL switches: `?t=40` start time, `?still` render one frame, `?render` hide the controls, `?cam=x,y,z,lx,ly,lz[,fov]` look
+from a fixed camera to inspect any spot.
 Space plays and pauses, arrows skip five seconds, `R` restarts.
 
 ## Render to video
@@ -55,6 +56,18 @@ has no controls, no watermark and no metadata.
 | `occupancy`, `swarm`, `wind` | Sensor grid, mesh network and wind streak overlays |
 | `props` | Smooth hull lofting, detailed sailboat, fishing boat, motorboat and ferry, waterline foam, buoy, lighthouse |
 | `timeline`, `player` | Film contract, easing, trapezoid ramps, time warp, script checks, the page player with end card and embed protocol |
+| `shots` | Shot lists: each shot owns the film until the next, with cuts, fades, dolly, orbit, hand-held drift and a list check |
+| `land`, `track` | Height-field land with painted shore or alpine palettes, plateaus, draped roads and fields; routes measured in metres, graded beds, railways, trains, glowing route lines |
+| `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |
+| `motes`, `shadow` | Time-placed glows, coins and inked puffs, rain, arcs; sun shadows for every toon surface |
+
+## Review stills
+
+```sh
+npx flatline-stills --url http://127.0.0.1:5180/ --times 4,12,30 --size 1280x720 --cols 3 [--cam x,y,z,lx,ly,lz]
+```
+
+Renders chosen instants and tiles them into one labelled contact sheet, and lists page errors and warnings.
 
 ## Audit a film before shipping
 
