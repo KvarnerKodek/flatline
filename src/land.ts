@@ -34,12 +34,21 @@ export function shorePaint(sand = 0xe9d8a6, grass = 0x7fb466, high = 0x5f9a5a, r
 
 /** Meadow on the valley floor, dark forest on the slopes, rock where it is steep and snow above `snow` metres. */
 export function alpinePaint(snow = 340, forest = 55): LandPaint {
-  const M = hex(0x86c05a), M2 = hex(0x9ccf62), F = hex(0x3f7a52), R = hex(0x9a948c), S = hex(0xf6f9ff);
+  const M = hex(0x86c05a), M2 = hex(0x9ccf62), F = hex(0x3f7a52), A = hex(0x8fa35a), R = hex(0x8f8a86), R2 = hex(0x6f6a6e), S = hex(0xf4f8ff), SS = hex(0xc9d4ec);
   return (x, y, z, steep) => {
-    const n = noise2(x * 0.012, z * 0.012), f = noise2(x * 0.06 + 9, z * 0.06);
-    if (y > snow + (n - 0.5) * 150 - steep * 30) return S.clone().multiplyScalar(steep > 0.9 ? 0.8 : 0.93 + 0.07 * Math.round(f * 2) / 2);
-    if (steep > 0.85 + f * 0.25) return R.clone().multiplyScalar(0.84 + 0.2 * Math.round(f * 3) / 3);
-    if (y > forest + n * 50 && y < snow - 60) return F.clone().multiplyScalar(0.86 + 0.24 * Math.round(f * 3) / 3);
+    const n = noise2(x * 0.012, z * 0.012), f = noise2(x * 0.06 + 9, z * 0.06), g = noise2(x * 0.03 + 4, z * 0.03 + 1);
+    const line = snow + (n - 0.5) * 150 + (g - 0.5) * 60 - steep * 25;
+    if (y > line && steep < 1.25 + f * 0.3) {
+      // Snow: cool white on gentle ground, lavender where it turns steep, in two painted steps.
+      return S.clone().lerp(SS, Math.round(Math.min(1, steep * 0.9 + (f - 0.5) * 0.4) * 2) / 2);
+    }
+    if (y > forest + n * 50 + 40 && (steep > 0.75 + f * 0.25 || y > line - 70)) {
+      // Rock: warm and cool greys in strata that follow the height, so faces read as layered stone.
+      const band = Math.round(((y / 23 + f * 0.8) % 1 + 1) % 1 * 2) / 2;
+      return R.clone().lerp(R2, band * 0.7 + (steep > 1.4 ? 0.3 : 0)).multiplyScalar(0.92 + 0.12 * Math.round(g * 2) / 2);
+    }
+    if (y > forest + n * 50 && y < line - 90) return F.clone().multiplyScalar(0.86 + 0.24 * Math.round(f * 3) / 3);
+    if (y > forest + n * 50) return A.clone().multiplyScalar(0.92 + 0.12 * Math.round(f * 2) / 2);
     return M.clone().lerp(M2, Math.round(noise2(x * 0.02 + 3, z * 0.02) * 3) / 3).multiplyScalar(0.94 + 0.1 * Math.round(f * 2) / 2);
   };
 }
