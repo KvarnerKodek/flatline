@@ -183,7 +183,7 @@ export function figure(o: FigureOpts = {}): Figure {
   part(head, new THREE.SphereGeometry(0.05, 10, 8).scale(1, 0.75, 1.5), skin, 0.15, -0.11, 0);
   const hair = o.hair ?? 0x3b2a20;
   part(head, new THREE.SphereGeometry(0.247, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.56).rotateZ(0.5), hair, -0.012, 0.012, 0);
-  part(head, new THREE.SphereGeometry(0.16, 14, 10).scale(0.55, 0.5, 1.25), hair, 0.13, 0.15, 0);
+  part(head, new THREE.SphereGeometry(0.16, 14, 10).scale(0.55, 0.42, 1.2), hair, 0.12, 0.2, 0);
   for (const s of [-1, 1]) {
     part(head, new THREE.SphereGeometry(0.045, 10, 8).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.225);
     part(head, new THREE.SphereGeometry(0.11, 12, 8).scale(0.9, 1.05, 0.55), hair, -0.03, 0.04, s * 0.19);
@@ -216,7 +216,7 @@ export function figure(o: FigureOpts = {}): Figure {
     face(new THREE.SphereGeometry(0.031, 12, 10).scale(0.6, 1.2, 1), 0x1b0f00, 0, 0, 0, e);
     face(new THREE.SphereGeometry(0.0095, 8, 6), 0xffffff, 0.017, 0.013, s * -0.004, e);
     eyes.push(e);
-    brows.push(face(new THREE.CapsuleGeometry(0.007, 0.042, 2, 6).rotateX(Math.PI / 2), hair, 0.214, 0.068, s * 0.084));
+    brows.push(face(new THREE.CapsuleGeometry(0.008, 0.044, 2, 6).rotateX(Math.PI / 2), hair, 0.216, 0.072, s * 0.084));
     part(head, new THREE.SphereGeometry(0.036, 10, 8).scale(0.35, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
   }
   part(head, new THREE.SphereGeometry(0.03, 10, 8).scale(1.2, 0.9, 0.9), skin, 0.232, -0.028, 0);
@@ -326,8 +326,8 @@ export function figure(o: FigureOpts = {}): Figure {
       head.rotation.set(drift * 0.04, (p.headYaw ?? 0) * 0.65 + drift * 0.07, (p.headPitch ?? 0) * 0.7 + Math.sin(t * 0.71 + seed) * 0.03 * life + Math.sin(w * 2) * st * 0.03);
 
       // Eyes: blinks every few seconds and small glances between fixations.
-      const beat = t * 0.31 + hash(seed), k = Math.floor(beat), within = (fract(beat) - 0.15 * hash(k + seed)) / 0.31 * 3.2;
-      const blink = within > 0 && within < 0.16 ? Math.sin((within / 0.16) * Math.PI) : 0;
+      const period = 3.2, beat = t / period + hash(seed), k = Math.floor(beat), since = (fract(beat) - 0.35 * hash(k + seed)) * period;
+      const blink = since > 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       const look = Math.floor(t * 0.9 + seed), gx = (hash(look) - 0.5) * 0.012 * (0.4 + still), gy = (hash(look + 3) - 0.5) * 0.008 * (0.4 + still);
       for (const e of eyes) { e.scale.set(1, 1 - 0.9 * blink, 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy; }
 
@@ -341,7 +341,7 @@ export function figure(o: FigureOpts = {}): Figure {
 
       const mood = p.mood ?? 0.6;
       mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1);
-      brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.45 * Math.max(0, -mood); br.position.y = 0.068 + 0.01 * Math.abs(mood); });
+      brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.5 * Math.max(0, -mood); br.position.y = 0.072 + 0.012 * Math.abs(mood); });
     },
   };
 }
