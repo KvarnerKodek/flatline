@@ -6,7 +6,9 @@ import { Mesher, finish } from './props';
 const rng = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
-export interface HouseOpts { w?: number; d?: number; h?: number; roof?: number; wall?: number; pitch?: number; chimney?: boolean; door?: number; storeys?: number; base?: number;
+export interface HouseOpts { w?: number; d?: number; h?: number; roof?: number; wall?: number; pitch?: number; chimney?: boolean; door?: number; storeys?: number; base?: number; shutters?: number | false;
+  /** `false` leaves the door wall without windows, for a shop front, a hatch or a sign. */
+  frontWindows?: boolean;
   /** Houses whose windows never light can share one `darkGlass()` material, so a whole town draws in a few calls. */
   glass?: THREE.ShaderMaterial; upper?: number; balcony?: boolean; flowers?: number; eave?: number }
 export interface House { root: THREE.Group; glass: THREE.ShaderMaterial; lamp: THREE.Sprite; height: number }
@@ -21,19 +23,50 @@ const DARK_GLASS = hex(0x27384d), WARM_GLASS = hex(0xffd591);
 export function house(o: HouseOpts = {}): House {
   const w = o.w ?? 6, d = o.d ?? 5, st = o.storeys ?? 1, h = o.h ?? 2.9 * st, pitch = o.pitch ?? 0.55;
   const wall = hex(o.wall ?? 0xf3ead8), roof = hex(o.roof ?? 0xc8553d), trim = wall.clone().multiplyScalar(0.8);
+  const r = rnd(Math.round(w * 97 + d * 31 + st * 7 + pitch * 1000 + (o.roof ?? 0) % 997));
   const m = new Mesher();
   m.box(0, h / 2, 0, w, h, d, wall);
-  m.box(0, 0.18, 0, w + 0.16, 0.36, d + 0.16, trim);
   if (o.base) m.box(0, -o.base / 2, 0, w + 0.5, o.base, d + 0.5, hex(0xa39c90));
+  // Stone plinth: a course of rough-cut blocks round the foot of the walls.
+  const stone = hex(0xb9ad9c);
+  for (const [len, along, fixed, axis] of [[w, 'x', d / 2, 'z'], [w, 'x', -d / 2, 'z'], [d, 'z', w / 2, 'x'], [d, 'z', -w / 2, 'x']] as const) {
+    for (let a = -len / 2; a < len / 2 - 0.05;) {
+      const bl = Math.min(len / 2 - a, 0.45 + r() * 0.4), c = a + bl / 2, col = stone.clone().multiplyScalar(0.86 + r() * 0.2);
+      const out = Math.sign(fixed) * (Math.abs(fixed) + 0.035);
+      if (along === 'x') m.box(c, 0.21, axis === 'z' ? out : 0, bl - 0.03, 0.42, 0.1, col);
+      else m.box(out, 0.21, c, 0.1, 0.42, bl - 0.03, col);
+      a += bl;
+    }
+  }
   // The roof is a slab whose underside clears the wall tops (cladding included) by 2 cm at any pitch or eave depth.
   const eave = o.eave ?? 0.5, th = 0.18, k = pitch * 1.6, clad = o.upper === undefined ? 0 : 0.06;
   const ex = w / 2 + eave, ez = d / 2 + eave, ridge = h + 0.02 + th + k * (d / 2 + clad), rh = ridge - h;
   const top = (z: number) => ridge - k * Math.abs(z), under = (z: number) => top(z) - th;
   const timber = o.upper === undefined ? wall : hex(o.upper), soffit = roof.clone().multiplyScalar(0.62), edge = roof.clone().multiplyScalar(0.8);
-  if (o.upper !== undefined) m.box(0, st > 1 ? (2.9 + h) / 2 : h - 0.5, 0, w + 2 * clad, st > 1 ? h - 2.9 : 1.0, d + 2 * clad, timber);
+  const frame = o.upper === undefined ? hex(0xfbf3e2) : hex(0xf6ecd6), wood = hex(0x5a3a26);
+  if (o.upper !== undefined) {
+    const y0 = st > 1 ? 2.9 : h - 1.0;
+    m.box(0, (y0 + h) / 2, 0, w + 2 * clad, h - y0, d + 2 * clad, timber);
+    // Log ends (Gwettköpfe) stacked at the corners, the signature of an alpine log storey; they stop short of the eaves.
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let y = y0 + 0.12; y < h - 0.3; y += 0.24) {
+      const c = timber.clone().multiplyScalar(0.82 + 0.1 * Math.sin(y * 13 + sx));
+      m.box(sx * (w / 2 + clad + 0.09), y, sz * (d / 2 - 0.12), 0.2, 0.2, 0.2, c);
+      m.box(sx * (w / 2 - 0.12), y + 0.12, sz * (d / 2 + clad + 0.09), 0.2, 0.2, 0.2, c);
+    }
+  }
+  // Shingled roof: staggered rows of boards, each row tilted a little under the slope so the rows catch the light.
+  const rows = Math.max(6, Math.round(Math.hypot(ez, rh) / 0.42));
   for (const s of [-1, 1]) {
     m.c = V(0, h, 0);
-    m.quad(V(-ex, top(ez), s * ez), V(ex, top(ez), s * ez), V(ex, ridge, 0), V(-ex, ridge, 0), roof);
+    for (let i = 0; i < rows; i++) {
+      const z0 = ez * (1 - i / rows), z1 = ez * (1 - (i + 1) / rows), cw = 0.5 + r() * 0.15, off = (i % 2) * cw * 0.5;
+      for (let x = -ex - off; x < ex;) {
+        const xa = Math.max(-ex, x), xb = Math.min(ex, x + cw);
+        const tone = roof.clone().multiplyScalar(0.88 + r() * 0.14 + (i === rows - 1 ? -0.08 : 0));
+        m.quad(V(xa, top(z0), s * z0), V(xb, top(z0), s * z0), V(xb, top(z1) - 0.035, s * z1), V(xa, top(z1) - 0.035, s * z1), tone);
+        x += cw;
+      }
+    }
     m.quad(V(-ex, under(ez), s * ez), V(ex, under(ez), s * ez), V(ex, top(ez), s * ez), V(-ex, top(ez), s * ez), edge);
     for (const g of [-1, 1]) m.quad(V(g * ex, under(ez), s * ez), V(g * ex, under(0), 0), V(g * ex, ridge, 0), V(g * ex, top(ez), s * ez), edge);
     m.c = V(0, ridge + 20, 0);
@@ -42,39 +75,96 @@ export function house(o: HouseOpts = {}): House {
     const gx = s * (w / 2 + clad), zw = d / 2 + clad;
     m.quad(V(gx, h, -zw), V(gx, h, zw), V(gx, under(zw), zw), V(gx, under(zw), -zw), timber);
     m.tri(V(gx, under(zw), -zw), V(gx, under(zw), zw), V(gx, under(0), 0), timber);
+    // Carved barge boards under the verges, standing just proud of the gable.
+    for (const g of [-1, 1]) {
+      const bx = g * (w / 2 + clad + 0.14), zEnd = ez - 0.05, drop = 0.2;
+      m.c = V(0, h, 0);
+      m.quad(V(bx, under(0), 0), V(bx, under(zEnd), s * zEnd), V(bx, under(zEnd) - drop, s * zEnd), V(bx, under(0) - drop, 0), wood);
+      m.c = V(g * 50, h, 0);
+      m.quad(V(bx, under(0), 0), V(bx, under(zEnd), s * zEnd), V(bx, under(zEnd) - drop, s * zEnd), V(bx, under(0) - drop, 0), wood);
+      m.c = V(0, h, 0);
+      for (let z = 0.1; z < zEnd - 0.2; z += 0.32) {
+        const y0 = under(z) - drop, y1 = under(z + 0.2) - drop;
+        m.tri(V(bx, y0, s * z), V(bx, y1, s * (z + 0.2)), V(bx, (y0 + y1) / 2 - 0.09, s * (z + 0.1)), wood);
+      }
+    }
   }
-  if (o.chimney ?? true) m.box(-w * 0.22, h + rh * 0.75, d * 0.18, 0.7, rh * 0.9 + 0.8, 0.7, trim);
+  if (o.chimney ?? true) {
+    const cx = -w * 0.22, cz = d * 0.18, ch = rh * 0.9 + 0.8, cy = h + rh * 0.75;
+    m.box(cx, cy, cz, 0.7, ch, 0.7, trim);
+    m.box(cx, cy + ch / 2 + 0.06, cz, 0.9, 0.12, 0.9, stone.clone().multiplyScalar(0.8));
+    m.box(cx, cy + ch / 2 + 0.24, cz, 0.36, 0.24, 0.36, stone.clone().multiplyScalar(0.7));
+  }
+  // Front door with a painted surround, a step and a little hood.
   m.box(w / 2 + 0.03, 1.05, 0, 0.08, 2.1, 1.1, hex(o.door ?? 0x6b4a35));
-  m.box(w / 2 + 0.25, 0.1, 0, 0.6, 0.2, 1.6, trim);
-  if (o.balcony) {
-    const by = st > 1 ? 2.9 : h - 0.2, wood = timber.clone().multiplyScalar(0.8);
-    m.box(w / 2 + 0.55, by, 0, 1.1, 0.14, d + 0.5, wood);
-    m.box(w / 2 + 1.05, by + 0.5, 0, 0.1, 0.9, d + 0.5, wood);
-    for (const z of [-d / 2 - 0.2, d / 2 + 0.2]) m.box(w / 2 + 0.55, by + 0.5, z, 1.1, 0.9, 0.1, wood);
-    if (o.flowers !== undefined) for (let z = -d / 2; z < d / 2 - 0.1; z += 0.5) m.box(w / 2 + 1.16, by + 1.02 + 0.07 * Math.sin(z * 9), z + 0.25, 0.3, 0.3, 0.44, z * 4 % 3 < 1 ? hex(0x5fa04e) : hex(o.flowers));
-  }
-  const root = finish(m);
-
+  for (const z of [-0.62, 0.62]) m.box(w / 2 + 0.06, 1.1, z, 0.1, 2.2, 0.14, frame);
+  m.box(w / 2 + 0.06, 2.24, 0, 0.1, 0.14, 1.38, frame);
+  m.box(w / 2 + 0.3, 2.5, 0, 0.6, 0.08, 1.6, roof.clone().multiplyScalar(0.85));
+  m.box(w / 2 + 0.25, 0.1, 0, 0.6, 0.2, 1.6, stone);
+  // Windows: a painted frame, a cross mullion and a pair of shutters, the same on every face.
+  const sh = o.shutters === false ? undefined : hex(o.shutters ?? 0x3f6f52), slat = sh?.clone().multiplyScalar(0.78);
+  const win = (nx: number, nz: number, cx: number, cy: number, cz: number, ww: number) => {
+    const t = (a: number, b: number) => (nx ? [a, b] : [b, a]) as [number, number];
+    const out = 0.075;
+    const at = (along: number, depth: number) => (nx ? [cx + nx * depth, cz + along] : [cx + along, cz + nz * depth]) as [number, number];
+    const bx = (along: number, y: number, depth: number, la: number, ly: number, ld: number, col: THREE.Vector3) => {
+      const [x, z] = at(along, depth), [sx, sz] = t(ld, la);
+      m.box(x, y, z, sx, ly, sz, col);
+    };
+    bx(0, cy - 0.58, out, ww + 0.34, 0.12, 0.2, frame);
+    bx(0, cy + 0.57, out, ww + 0.26, 0.1, 0.12, frame);
+    for (const g of [-1, 1]) bx(g * (ww / 2 + 0.06), cy, out, 0.1, 1.1, 0.12, frame);
+    bx(0, cy, out + 0.02, 0.05, 1.0, 0.04, frame);
+    bx(0, cy + 0.12, out + 0.02, ww, 0.05, 0.04, frame);
+    if (sh && slat) for (const g of [-1, 1]) {
+      const sa = g * (ww / 2 + 0.12 + ww * 0.26);
+      bx(sa, cy, 0.05, ww * 0.5, 1.08, 0.05, sh);
+      for (const yy of [-0.32, 0, 0.32]) bx(sa, cy + yy, 0.085, ww * 0.42, 0.06, 0.03, slat);
+    }
+  };
   const gm = new Mesher();
   for (let s = 0; s < st; s++) {
     const y = 1.55 + s * 2.9;
-    for (const z of [-d * 0.3, d * 0.3]) if (s > 0 || Math.abs(z) > 0.9) gm.box(w / 2 + 0.04, y, z, 0.06, 1.0, 0.8, hex(0xffffff));
-    for (const sg of [-1, 1]) for (const x of [-w * 0.25, w * 0.25]) gm.box(x, y, sg * (d / 2 + 0.04), 0.9, 1.0, 0.06, hex(0xffffff));
+    for (const z of o.frontWindows === false ? [] : [-d * 0.3, d * 0.3]) if (s > 0 || Math.abs(z) > 0.9) { gm.box(w / 2 + 0.04, y, z, 0.06, 1.0, 0.8, hex(0xffffff)); win(1, 0, w / 2, y, z, 0.8); }
+    for (const sg of [-1, 1]) for (const x of [-w * 0.25, w * 0.25]) { gm.box(x, y, sg * (d / 2 + 0.04), 0.9, 1.0, 0.06, hex(0xffffff)); win(0, sg, x, y, sg * (d / 2 + clad * (s > 0 || st === 1 ? 1 : 0)), 0.9); }
     gm.box(-w / 2 - 0.04, y, 0, 0.06, 1.0, 0.9, hex(0xffffff));
+    win(-1, 0, -w / 2, y, 0, 0.9);
   }
+  if (o.balcony) {
+    // A carved balcony: boards with a waisted cut-out between them, a top rail, and geraniums spilling over.
+    const by = st > 1 ? 2.9 : h - 0.2, bw = timber.clone().multiplyScalar(0.8), bx = w / 2 + 1.05, span = d + 0.5;
+    m.box(w / 2 + 0.55, by, 0, 1.1, 0.14, span, bw);
+    for (let z = -span / 2 + 0.08; z < span / 2 - 0.05; z += 0.19) {
+      m.box(bx, by + 0.22, z, 0.06, 0.3, 0.15, bw);
+      m.box(bx, by + 0.46, z, 0.06, 0.18, 0.08, bw);
+      m.box(bx, by + 0.7, z, 0.06, 0.3, 0.15, bw);
+    }
+    m.box(bx, by + 0.9, 0, 0.12, 0.1, span + 0.06, bw.clone().multiplyScalar(0.9));
+    m.box(bx, by + 0.09, 0, 0.1, 0.06, span, bw.clone().multiplyScalar(0.9));
+    for (const z of [-span / 2, span / 2]) m.box(w / 2 + 0.55, by + 0.47, z, 1.1, 0.86, 0.08, bw);
+    if (o.flowers !== undefined) {
+      const bloom = hex(o.flowers), leaf = hex(0x4f8a3e);
+      m.box(bx + 0.14, by + 1.0, 0, 0.22, 0.18, span - 0.2, wood);
+      for (let z = -span / 2 + 0.25; z < span / 2 - 0.2; z += 0.3) {
+        m.ball(bx + 0.18, by + 1.12, z, 0.15, leaf.clone().multiplyScalar(0.9 + r() * 0.2), 0.75);
+        m.ball(bx + 0.26, by + 0.98, z + 0.1, 0.11, leaf, 1.1);
+        for (let f = 0; f < 2; f++) m.ball(bx + 0.2 + r() * 0.1, by + 1.2 + r() * 0.08, z + (r() - 0.5) * 0.22, 0.075, bloom.clone().multiplyScalar(0.92 + r() * 0.16));
+      }
+    }
+  }
+  const root = finish(m);
   const glass = o.glass ?? darkGlass();
   const panes = new THREE.Mesh(gm.geo().crisp, glass);
   panes.userData.noShadow = true;
   root.add(panes);
-  const fm = new Mesher();
-  for (let s = 0; s < st; s++) for (const sg of [-1, 1]) for (const x of [-w * 0.25, w * 0.25]) fm.box(x, 0.98 + s * 2.9, sg * (d / 2 + 0.08), 1.1, 0.1, 0.16, trim);
-  root.add(finish(fm));
   const lamp = glow(0xffb85c, Math.max(w, d) * 1.7, 0);
   lamp.visible = false;
   lamp.position.set(w * 0.3, 1.6, 0);
   root.add(lamp);
   return { root, glass, lamp, height: h + rh };
 }
+
+const rnd = (seed: number) => () => ((seed = (seed * 16807 + 11) % 2147483647) / 2147483647);
 
 /** Unlit window glass; pass one to many houses through `HouseOpts.glass`. */
 export const darkGlass = () => toon({ color: 0x27384d, emissive: 0xffc46b, emisAmt: 0, spec: 0.5 });

@@ -40,6 +40,13 @@ export class Mesher {
     this.quad(B, F, Gv, C, col);
     this.quad(A, B, C, D, col);
   }
+  /** A rounded lump (an icosahedron), for flowers, leaves and stones. `sy` squashes it vertically. */
+  ball(x: number, y: number, z: number, r: number, col: THREE.Vector3, sy = 1, detail = 0) {
+    this.c = new THREE.Vector3(x, y, z);
+    const g = new THREE.IcosahedronGeometry(r, detail).scale(1, sy, 1).translate(x, y, z);
+    const p = g.getAttribute('position'), v = (i: number) => new THREE.Vector3().fromBufferAttribute(p, i);
+    for (let i = 0; i < p.count; i += 3) this.tri(v(i), v(i + 1), v(i + 2), col);
+  }
   cyl(x: number, y0: number, z: number, y1: number, r: number, col: THREE.Vector3, seg = 8, r1 = r) {
     this.c = new THREE.Vector3(x, (y0 + y1) / 2, z);
     for (let i = 0; i < seg; i++) {
