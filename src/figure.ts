@@ -557,3 +557,33 @@ export function cow(coat = 0xa8683c, patch = 0xfff6e6): Cow {
     },
   };
 }
+
+const smooth01 = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
+
+/**
+ * A gesture curve from 0 to 1 over `dur` seconds from `t0`, acted rather than tweened: a small wind-up the other
+ * way first (`anticipate`), a move that overshoots by `overshoot` and a settle. Pure in `t`, so it seeks cleanly.
+ */
+export function gesture(t: number, t0: number, dur: number, anticipate = 0.15, overshoot = 0.08): number {
+  const u = (t - t0) / dur;
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  if (u < 0.22) return -anticipate * Math.sin((u / 0.22) * Math.PI * 0.5);
+  if (u < 0.7) { const k = smooth01((u - 0.22) / 0.48); return -anticipate + (1 + overshoot + anticipate) * k; }
+  return 1 + overshoot * (1 - smooth01((u - 0.7) / 0.3));
+}
+
+/** Holds a pose from `t0` to `t1`, easing in and out over `ramp` seconds: 0 outside, 1 while held. */
+export const held = (t: number, t0: number, t1: number, ramp = 0.35) => Math.min(smooth01((t - t0) / ramp), 1 - smooth01((t - (t1 - ramp)) / ramp));
+
+/** Blends two poses field by field: numbers and grip points ease from `a` to `b`; anything else is taken from `b`. */
+export function mixPose(a: FigurePose, b: FigurePose, k: number): FigurePose {
+  const out: FigurePose = { ...b };
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof FigurePose>) {
+    const x = a[key], y = b[key];
+    if (typeof x === 'number' || typeof y === 'number') (out as Record<string, unknown>)[key] = ((x as number | undefined) ?? 0) + (((y as number | undefined) ?? 0) - ((x as number | undefined) ?? 0)) * k;
+    else if (x instanceof THREE.Vector3 && y instanceof THREE.Vector3) (out as Record<string, unknown>)[key] = x.clone().lerp(y, k);
+    else if (x instanceof THREE.Vector3 && !y) (out as Record<string, unknown>)[key] = k < 1 ? x : undefined;
+  }
+  return out;
+}

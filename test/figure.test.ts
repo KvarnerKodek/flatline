@@ -110,3 +110,27 @@ describe('carry', () => {
     expect(at(f.handR).distanceTo(at(wheel))).toBeGreaterThan(0.35);
   });
 });
+
+describe('acting curves', () => {
+  it('a gesture winds up, overshoots, settles, and never jumps', async () => {
+    const { gesture } = await import('../src/figure');
+    expect(gesture(0.9, 1, 2)).toBe(0);
+    expect(gesture(3.1, 1, 2)).toBe(1);
+    let lo = 0, hi = 0, prev = 0, jump = 0;
+    for (let t = 1; t <= 3; t += 0.005) { const g = gesture(t, 1, 2); lo = Math.min(lo, g); hi = Math.max(hi, g); jump = Math.max(jump, Math.abs(g - prev)); prev = g; }
+    expect(lo).toBeLessThan(-0.1);
+    expect(hi).toBeGreaterThan(1.05);
+    expect(jump).toBeLessThan(0.03);
+  });
+
+  it('holds ease in and out, and poses blend field by field', async () => {
+    const { held, mixPose } = await import('../src/figure');
+    expect(held(0, 1, 3)).toBe(0);
+    expect(held(2, 1, 3)).toBe(1);
+    expect(held(3.5, 1, 3)).toBe(0);
+    const m = mixPose({ armR: 0, mood: -1 }, { armR: 2, mood: 1, headYaw: 0.5 }, 0.5);
+    expect(m.armR).toBeCloseTo(1);
+    expect(m.mood).toBeCloseTo(0);
+    expect(m.headYaw).toBeCloseTo(0.25);
+  });
+});
