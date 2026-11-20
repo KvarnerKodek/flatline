@@ -2,6 +2,7 @@
 // Audits a flatline film the way a viewer would, before you render or ship it.
 //   flatline-check --url http://127.0.0.1:5180/ [--fps 4] [--size 480x270] [--top 10]
 // 1. Purity: the same instant must look identical however it is reached (seek order must not matter).
+// (CSS transitions and animations are frozen so only film-time effects are compared.)
 // 2. Jumps: lists the biggest frame-to-frame changes so unplanned hard cuts and pops stand out.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -19,6 +20,7 @@ const page = await browser.newPage();
 await page.goto(`${a.url}${a.url.includes('?') ? '&' : '?'}still&render&t=0`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => document.title === 'ready' && window.__flatline, { timeout: 120000 });
 await page.evaluate(() => { performance.now = () => 1000; });
+await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important}' });
 const dur = await page.evaluate(() => window.__flatline.duration);
 const dir = mkdtempSync(join(tmpdir(), 'flatline-check-'));
 const shot = async (t) => { await page.evaluate((x) => window.__flatline.seek(x), t); return page.screenshot({ type: 'png' }); };
