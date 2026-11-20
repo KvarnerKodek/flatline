@@ -186,6 +186,21 @@ export function lightHouse(hs: House, a: number) {
   hs.lamp.visible = a > 0.001;
 }
 
+export interface Placed { house: House; x: number; y: number; z: number; yaw: number; scale?: number }
+
+/** Bakes placed houses into one mesh per material, so a whole town draws in three calls. */
+export function bakeTown(placed: Placed[]): THREE.Group {
+  const parts: THREE.BufferGeometry[][] = [[], [], []], mats: THREE.Material[] = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
+  for (const o of placed) {
+    m.compose(p.set(o.x, o.y, o.z), q.setFromEuler(e.set(0, o.yaw, 0)), s.setScalar(o.scale ?? 1));
+    (o.house.root.children.slice(0, 3) as THREE.Mesh[]).forEach((c, i) => { parts[i].push(c.geometry.clone().applyMatrix4(m)); mats[i] = c.material as THREE.Material; });
+  }
+  const g = new THREE.Group();
+  parts.forEach((gs, i) => { const geo = mergeGeometries(gs); if (geo) g.add(new THREE.Mesh(geo, mats[i])); });
+  return g;
+}
+
 /** A plank pier running along +x from the origin, standing on piles. */
 export function pier(length: number, width = 3.2, deck = 1.2): THREE.Group {
   const m = new Mesher(), wood = hex(0xa67c52), dark = hex(0x6f5238);
