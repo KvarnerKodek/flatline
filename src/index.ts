@@ -19,6 +19,8 @@ export * from './land';
 export * from './terrain';
 export * from './town';
 export * from './figure';
+export * from './critter';
+export * from './scenery';
 export * from './motes';
 export * from './track';
 export * from './shadow';
