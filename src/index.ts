@@ -23,3 +23,4 @@ export * from './track';
 export * from './shadow';
 export * from './look';
 export * from './edges';
+export * from './softclouds';
