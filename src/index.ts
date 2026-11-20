@@ -16,6 +16,7 @@ export * from './clouds';
 export * from './birds';
 export * from './shots';
 export * from './land';
+export * from './terrain';
 export * from './town';
 export * from './figure';
 export * from './motes';

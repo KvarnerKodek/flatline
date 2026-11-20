@@ -66,6 +66,7 @@ has no controls, no watermark and no metadata.
 | `softclouds` | Painted cumulus: lit lobes with bright tops, lavender undersides and a warm rim |
 | `instanced` | `Inst`: thousands of copies in one draw call with per-instance colour, ink outline, wind sway and distance fade |
 | `fx`, `meadow` | Scheduled sprite bursts; a painted meadow ground with a palette |
+| `terrain` | `paintedTerrain`: one painted landscape mesh from any height function, with flat building sites, painted paths, patchwork fields, brush streaks, cloud and sun shadow and a relief rim; `valleyHeight`, `flattenSites`, `gridAxis` |
 
 ## Looks
 
@@ -79,6 +80,20 @@ const film: Film<World> = { /* ... */, look: GHIBLI };   // or CEL, or your own 
 `GHIBLI` is hand-painted: soft band edges, brush-and-wash mottling on every surface (`G.uPaint`), warm brown ink instead of black (`setInk`), gentler highlights and rim, thin screen-space ink lines (`Look.edges`, which replace the inverted-hull outlines and also work on instanced meshes), periwinkle distance haze and valley mist (`Look.haze`, `setGroundFog`), and a grade with optional `paper` and `bleed`. Pair it with `makeSoftClouds` instead of `makeClouds`. Meshes that must not get ink lines (sprites, glows, the sky) are tagged `userData.noEdge = true`.
 
 The page chrome is themable without touching flatline's own styles: `play(film, { theme: { className: 'brand', vars: { '--accent': '#505ff1' } } })` adds a body class and CSS variables so a host stylesheet can scope its rules. `play(film, { hud: { markers: 'none' } })` drops the lock-on brackets and leader lines for films where tracked objects are not targets (the default stays brackets). Anything can rest on any surface with `placeOn(placed, pose, t, (x, z, t) => height)`; `place` is the sea version. Optional kits can be imported on their own: `flatline/sea` and `flatline/sensing`.
+
+```ts
+import { paintedTerrain, valleyHeight, G } from 'flatline';
+G.uWaterline.value = 0;   // dry land: no sea darkening at y = 0
+const land = paintedTerrain({
+  height: valleyHeight({ axis: (z) => 60 * Math.sin(z * 0.0035) }),
+  x: [[-1500, -400, 24], [-400, 400, 6], [400, 1500, 24]],   // [from, to, step]: fine grid near the action
+  z: [[-1500, -300, 24], [-300, 300, 6], [300, 1000, 24]],
+  sites: [{ x: -120, z: -40, rx: 30, rz: 22, y: 4 }],         // flat stands for buildings
+  paths: [[{ x: -200, z: 100 }, { x: 0, z: -80 }]],
+});
+scene.add(land.mesh);
+house.root.position.set(-120, land.stand(-120, -40), -40);
+```
 
 ## Review stills
 
