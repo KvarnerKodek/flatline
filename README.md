@@ -134,6 +134,13 @@ npx flatline-check --url http://127.0.0.1:5180/
 Checks that the picture does not depend on seek order and lists the biggest frame-to-frame jumps, which is how an
 unplanned hard cut or pop is found. Run it after every scene change.
 
+## Make a film with agents
+
+`skills/film-from-idea` is an agent skill (SKILL.md) that takes a one-line idea to a finished film: it writes the story
+bible, scaffolds a flatline project, then runs waves of parallel agents that each own one area and log small,
+verified iterations, backed by detectors for overlaps, clipping, z-fighting, hard decals, label clashes and UI
+collisions. Copy the folder into your agent's skills directory to use it.
+
 ## Rules the code keeps
 
 - Everything is authored in display space: no colour management, no tone mapping, so a colour in the
