@@ -57,6 +57,7 @@ body.letterbox{--bar:max(0px,calc((100vh - 100vw/var(--lb))/2))}
 body.letterbox::before,body.letterbox::after{content:"";position:fixed;left:0;right:0;height:var(--bar);background:#000;z-index:3;pointer-events:none}
 body.letterbox::before{top:0}body.letterbox::after{bottom:0}
 body.letterbox .cap:not(.title){bottom:calc(var(--bar) + clamp(28px,6vh,64px))}
+@media (max-width:800px),(max-height:420px){.cap:not(.title){max-width:58vw}.cap:not(.title) .k{font-size:9px;margin-bottom:6px;letter-spacing:.2em}.cap:not(.title) h2{font-size:clamp(14px,3.4vw,22px)}.cap:not(.title) p{font-size:11px;margin-top:4px}.tag{font-size:10px;padding:4px 7px}.tag b{font-size:11px}.chap{font-size:10px}}
 body.letterbox .mark,body.letterbox .chap{top:calc(var(--bar) + clamp(12px,2vw,24px))}
 body.letterbox #ui{z-index:4}
 #hud.nomarkers .brk,#hud.nomarkers .lead{display:none}

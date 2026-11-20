@@ -12,7 +12,21 @@ const el = (tag: string, cls?: string, html?: string) => {
 };
 
 /** How tracked objects are marked: lock-on corner brackets with a leader line (the original), or just the tag. */
-export interface HudOptions { markers?: 'brackets' | 'none' }
+export interface HudOptions {
+  markers?: 'brackets' | 'none';
+  /** Vertical distance in pixels between tags that overlap; default 50. */
+  tagStep?: number;
+  /** Lowest a tag may sit, as a fraction of the viewport height; default 0.55. */
+  tagReach?: number;
+}
+
+export interface TagBox { x: number; y: number; w: number }
+
+/** Moves a tag at (`x`, `y`) of width `w` away from every placed tag it overlaps horizontally, a `step` at a time, in the direction it already leans. */
+export function clearTag(placed: TagBox[], x: number, y: number, w: number, step = 50): number {
+  for (const p of placed) if (x < p.x + p.w + 6 && p.x < x + w + 6 && Math.abs(y - p.y) < step) y = p.y + (y >= p.y ? step : -step);
+  return y;
+}
 
 export interface TrackSpec {
   id: string;
@@ -39,7 +53,7 @@ export class Hud {
   pip = el('div', 'pip', '<span>Thermal</span><em>LWIR · tracking</em>');
 
 
-  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void, brand?: string, opts: HudOptions = {}) {
+  constructor(captions: Caption[], private chapters: Chapter[], private duration: number, onToggle: () => void, onSeek: (t: number) => void, brand?: string, private opts: HudOptions = {}) {
     if (opts.markers === 'none') this.root.classList.add('nomarkers');
     this.root.append(...(brand ? [el('div', 'mark', brand)] : []), this.chap, this.pip);
     this.pip.style.opacity = '0';
@@ -113,7 +127,7 @@ export class Hud {
 
     const seen = new Set<string>();
     const placed: { x: number; y: number; w: number }[] = [];
-    const TAG_H = 50;
+    const { tagStep = 50, tagReach = 0.55 } = this.opts;
     for (const tr of tracks) {
       seen.add(tr.id);
       let n = this.pool.get(tr.id);
@@ -134,10 +148,10 @@ export class Hud {
       const html = `<b>${tr.title}</b>${tr.lines.join('<br>')}`;
       if (n.tag.innerHTML !== html) { n.tag.innerHTML = html; n.w = n.tag.offsetWidth; }
       const tx = Math.min(Math.max(x + (tr.dx ?? tr.size * 46), 8), Math.max(8, w - (n.w ?? 0) - 8));
-      let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), Math.min(116, h * 0.2)), h * 0.55);
+      let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), Math.min(116, h * 0.2)), h * tagReach);
       const shown = o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3));
       if (shown > 0.05) {
-        for (const p of placed) if (tx < p.x + p.w + 6 && p.x < tx + (n.w ?? 0) + 6 && Math.abs(ty - p.y) < TAG_H) ty = p.y + (ty >= p.y ? TAG_H : -TAG_H);
+        ty = clearTag(placed, tx, ty, n.w ?? 0, tagStep);
         placed.push({ x: tx, y: ty, w: n.w ?? 0 });
       }
       n.tag.style.cssText = `--c:${tr.color};opacity:${o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3))};transform:translate(${tx}px,${ty}px)`;
