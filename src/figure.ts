@@ -23,7 +23,8 @@ function shadow(parent: THREE.Object3D, rx: number, rz: number) {
 }
 
 export interface FigureOpts { skin?: number; coat?: number; legs?: number; hair?: number; hat?: number; scarf?: number; dress?: boolean; apron?: number; build?: number }
-export interface FigurePose { walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number }
+/** `mood` runs from -1, a worried frown with raised inner brows, to 1, a smile. */
+export interface FigurePose { walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number; mood?: number }
 
 export interface Figure { root: THREE.Group; hand: THREE.Object3D; pose(p: FigurePose): void }
 
@@ -66,7 +67,16 @@ export function figure(o: FigureOpts = {}): Figure {
   torso.add(head);
   part(head, new THREE.SphereGeometry(0.23, 14, 10), skin);
   part(head, new THREE.SphereGeometry(0.245, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55).rotateZ(0.5), o.hair ?? 0x3b2a20, -0.012, 0.012, 0);
-  for (const s of [-1, 1]) part(head, new THREE.SphereGeometry(0.028, 6, 5), 0x1b0f00, 0.215, 0.01, s * 0.085);
+  const brows: THREE.Mesh[] = [];
+  const face = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); head.add(m); return m; };
+  for (const s of [-1, 1]) {
+    part(head, new THREE.SphereGeometry(0.03, 8, 6).scale(0.6, 1.15, 1), 0x1b0f00, 0.212, 0.012, s * 0.082);
+    face(new THREE.SphereGeometry(0.009, 6, 4), 0xffffff, 0.229, 0.024, s * 0.078);
+    brows.push(face(new THREE.BoxGeometry(0.012, 0.012, 0.055), o.hair ?? 0x3b2a20, 0.214, 0.066, s * 0.084));
+    face(new THREE.SphereGeometry(0.036, 8, 6).scale(0.35, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
+  }
+  part(head, new THREE.SphereGeometry(0.03, 8, 6).scale(1.2, 0.9, 0.9), skin, 0.232, -0.028, 0);
+  const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 10, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.216, -0.095, 0);
   if (o.hat !== undefined) {
     part(head, new THREE.CylinderGeometry(0.44, 0.46, 0.035, 18), o.hat, 0, 0.15, 0);
     part(head, new THREE.CylinderGeometry(0.17, 0.21, 0.17, 14), o.hat, 0, 0.24, 0);
@@ -81,6 +91,9 @@ export function figure(o: FigureOpts = {}): Figure {
       aL.g.rotation.x = -(p.reachL ?? 0); aR.g.rotation.x = p.reachR ?? 0;
       head.rotation.y = p.headYaw ?? 0; head.rotation.z = p.headPitch ?? 0;
       torso.rotation.z = -(p.bow ?? 0);
+      const mood = p.mood ?? 0.6;
+      mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1);
+      brows.forEach((b, i) => { b.rotation.x = (i ? 1 : -1) * 0.45 * Math.max(0, -mood); b.position.y = 0.066 + 0.01 * Math.abs(mood); });
     },
   };
 }
