@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { Caption, Chapter, TrackSpec } from './hud';
 import type { SunShadow } from './shadow';
+import type { Grade } from './post';
+import type { Look } from './look';
 
 export type { Caption, Chapter, TrackSpec };
 
@@ -60,6 +62,10 @@ export interface Film<W> {
   warp?(t: number): number;
   /** Sun shadows to draw before each frame; aim them from `frame`. */
   sun?(world: W): SunShadow;
+  /** How the film is drawn: shading, linework, painterly texture, haze and grade. `GHIBLI` or `CEL`, or your own. */
+  look?: Look;
+  /** Optional final grade; overrides the look's own. */
+  grade?: Grade;
   /** Crop the picture to this aspect ratio with black bars, such as 2.39 for widescreen cinema. */
   letterbox?: number;
   /** Playback time at which the film proper ends and the end card is fully shown. */

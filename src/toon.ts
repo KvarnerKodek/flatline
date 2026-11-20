@@ -22,10 +22,18 @@ export const G = {
   uShadowMatN: { value: new THREE.Matrix4() },
   uShadowOn: { value: 0 },
   uShadowTexel: { value: 1 / 4096 },
+  /** Painterly brush-and-wash mottling: 0 is clean toon, 1 is hand-painted. */
+  uPaint: { value: 0 },
+  /** Band softness (0 hard cel edges, 1 and up soft painted edges). */
+  uSoft: { value: 0 },
+  /** Highlight and rim-light strength, and outline thickness multipliers: 1 is the original look. */
+  uSpecK: { value: 1 },
+  uRimK: { value: 1 },
+  uOutlineK: { value: 1 },
 };
 
 export const COMMON = /* glsl */ `
-uniform float uTime, uFogD, uNight, uSea, uWaterline;
+uniform float uTime, uFogD, uNight, uSea, uWaterline, uPaint, uSoft, uSpecK, uRimK, uOutlineK;
 uniform vec3 uLightDir, uLightCol, uAmb, uShadow, uRim, uFog;
 uniform vec2 uRes;
 float hash11(float p){ p = fract(p*.1031); p *= p+33.33; p *= p+p; return fract(p); }
@@ -81,27 +89,35 @@ float sunShadow(float nl){
 }
 void main(){
   vec3 base = mix(uBase, vC, uVC);
+  if (uPaint > 0.) {
+    float dc = length(cameraPosition - vW), fadeP = 1.-smoothstep(120.,520.,dc);
+    float wash = fbm(vW.xz*.11 + vW.y*.31) - .5, stroke = fbm(vec2(dot(vW.xz, vec2(.8,.6))*.42 + vW.y*.8, vW.y*.65 + vW.x*.05)*1.4) - .5;
+    base *= 1. + uPaint*fadeP*(.34*wash + .26*stroke);
+    base = mix(base, base*vec3(1.05,1.02,.9), uPaint*fadeP*smoothstep(.0,.5,wash));
+  }
   base *= 1. + uGrain*((step(.5, vnoise(vW.xz*.55))-.5)*.07 + (vnoise(vW.xz*.07)-.5)*.16 + (step(.62, vnoise(vW.xz*2.3+7.))-.3)*.035);
   vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vW);
   float nl = dot(n, uLightDir);
   nl = mix(nl, min(nl, -.2), nl > 0. ? sunShadow(nl) : 0.);
   float hemi = n.y*.5+.5;
-  float b1 = smoothstep(-.06,.0,nl), b2 = smoothstep(.34,.4,nl);
+  float sf = uSoft*.12;
+  float b1 = smoothstep(-.06-sf,.0+sf,nl), b2 = smoothstep(.34-sf,.4+sf,nl);
   vec3 shade = base*(uShadow*(.7+.3*hemi)+uAmb*.22);
   vec3 mid = base*(uAmb*.5+uLightCol*.42);
   vec3 lit = base*(uAmb*.3+uLightCol*.78);
   float ex = 1.-.34*uNight; mid *= ex; lit *= ex; shade *= 1.-.2*uNight;
   vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
-  float edge1 = smoothstep(-.06,.0,nl) - smoothstep(.0,.06,nl);
-  col += uShadow*.35*edge1*base;
+  float edge1 = smoothstep(-.06-sf,.0+sf,nl) - smoothstep(.0,.06+sf,nl);
+  col += uShadow*.35*edge1*base*(1.-.5*min(uSoft,1.));
   float wl = smoothstep(-.2,1.1,vW.y);
   col *= mix(1., mix(.72, 1., wl), uWaterline);
   col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
   float rim = pow(1.-max(dot(n,v),0.),3.);
-  col += uRim*smoothstep(.46,.52,rim)*(.3+.7*hemi)*mix(.38,.75,uNight);
+  col += uRim*smoothstep(.46-sf,.52+sf,rim)*(.3+.7*hemi)*mix(.38,.75,uNight)*uRimK;
+  col += base*vec3(.95,.78,.45)*(1.-hemi)*.08*min(uSoft,1.)*(1.-uNight);
   vec3 h = normalize(uLightDir+v);
-  col += uLightCol*step(.55,pow(max(dot(n,h),0.),70.))*uSpec;
+  col += uLightCol*step(.55,pow(max(dot(n,h),0.),70.))*uSpec*uSpecK;
   col += uEmisCol*uEmis*(1.+uEmisN*uNight);
   float d = length(cameraPosition - vW);
   col = applyFog(col, d);
@@ -147,12 +163,14 @@ export function toon(o: ToonOpts = {}): THREE.ShaderMaterial {
 }
 
 export const INK = hex(0x050a14);
+/** Change the colour of every ink outline (a hand-painted look wants warm brown, not black). */
+export const setInk = (h: number) => INK.copy(hex(h));
 
 export function outline(px = 2.2): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { ...G, uPx: { value: px }, uInk: { value: INK } },
     vertexShader: /* glsl */ `
-      uniform vec2 uRes; uniform float uPx;
+      uniform vec2 uRes; uniform float uPx, uOutlineK;
       varying vec3 vW;
       void main(){
         vec4 w = modelMatrix*vec4(position,1.);
@@ -160,7 +178,7 @@ export function outline(px = 2.2): THREE.ShaderMaterial {
         vec4 clip = projectionMatrix*viewMatrix*w;
         vec3 nv = mat3(viewMatrix)*(mat3(modelMatrix)*normal);
         vec2 dir = normalize(nv.xy + 1e-5);
-        float px = uPx*clamp(7./clip.w, .3, 1.);
+        float px = uPx*uOutlineK*clamp(7./clip.w, .3, 1.);
         clip.xy += dir * (2.*px) / uRes * clip.w;
         gl_Position = clip;
       }`,
