@@ -61,7 +61,7 @@ has no controls, no watermark and no metadata.
 | `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |
 | `score`, `soundtrack` | A film score as notes, synthesised deterministically (piano, bells, pads, strings, bass, reverb) and played in sync with film time; the renderer muxes the same audio |
 | `critter` | `Critter`: a round helper with a glowing screen face (seven expressions, blinking), hover thruster, swinging arms, a two-segment tail and a lagging antenna; `secondary` is the pure secondary-motion function |
-| `scenery` | `scatter` random spots by rule, `treeField` and `tufts` instanced forests and grass with sway and distance fade, `windmill` a tower mill with turning sails |
+| `scenery` | `scatter` random spots by rule (`keepClear` and `corridorGap` keep them out of roads and vehicle lanes), `treeField` and `tufts` instanced forests and grass with sway and distance fade, `windmill` a tower mill with turning sails |
 | `cues` | Sound effects and generative music as cues on the film clock, synthesised with WebAudio live and offline (`voice`, `bus`, `room`); `generateCues` writes a score from layers (pads, arpeggios, melody, pulse, ambient bed) and a loudness arc; `CuePlayer` plays and exports it |
 | `motes`, `shadow` | Time-placed glows, coins and inked puffs, rain, arcs; sun shadows for every toon surface |
 | `look` | `Look` presets (`CEL`, the original crisp toon, and `GHIBLI`, hand-painted) and `applyLook` |

@@ -34,6 +34,22 @@ export function scatter(o: ScatterOpts): Spot[] {
   return out;
 }
 
+/** A strip kept free of scenery: a polyline of ground points and the half width of the strip. */
+export interface Corridor { points: Array<{ x: number; z: number }>; half: number }
+
+const segmentDistance = (x: number, z: number, a: { x: number; z: number }, b: { x: number; z: number }) => {
+  const dx = b.x - a.x, dz = b.z - a.z, u = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(x - a.x - u * dx, z - a.z - u * dz);
+};
+
+/** Distance from (x, z) to the edge of the nearest corridor: negative inside one, `Infinity` when there are none. */
+export function corridorGap(corridors: Corridor[], x: number, z: number): number {
+  return corridors.reduce((gap, c) => c.points.reduce((m, q, i) => (i ? Math.min(m, segmentDistance(x, z, c.points[i - 1], q) - c.half) : m), gap), Infinity);
+}
+
+/** An `accept` for `scatter` that keeps every spot at least `margin` metres off the corridors, so trees never stand in a road or a vehicle's way. */
+export const keepClear = (corridors: Corridor[], margin = 0) => (x: number, z: number) => corridorGap(corridors, x, z) >= margin;
+
 export interface TreeFieldOpts {
   greens?: number[];
   trunk?: number;
