@@ -18,7 +18,10 @@ export const G = {
   uWaterline: { value: 1 },
   uShadowMap: { value: null as THREE.Texture | null },
   uShadowMat: { value: new THREE.Matrix4() },
+  uShadowMapN: { value: null as THREE.Texture | null },
+  uShadowMatN: { value: new THREE.Matrix4() },
   uShadowOn: { value: 0 },
+  uShadowTexel: { value: 1 / 4096 },
 };
 
 export const COMMON = /* glsl */ `
@@ -34,8 +37,8 @@ vec3 applyFog(vec3 c, float d){ float f = 1.-exp(-pow(d*uFogD,1.35)); return mix
 `;
 
 const TOON_VS = /* glsl */ `
-varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS;
-uniform mat4 uShadowMat;
+varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
+uniform mat4 uShadowMat, uShadowMatN;
 #ifdef ICOL
 attribute vec3 iColor;
 #endif
@@ -53,22 +56,28 @@ void main(){
   vC = iColor;
   #endif
   vS = uShadowMat*vec4(w.xyz + vN*.16, 1.);
+  vSN = uShadowMatN*vec4(w.xyz + vN*.05, 1.);
   gl_Position = projectionMatrix*viewMatrix*w;
 }`;
 
 const TOON_FS = /* glsl */ `
 ${COMMON}
-varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS;
+varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
 uniform vec3 uBase; uniform float uVC, uEmis, uSpec, uAlpha, uEmisN, uGrain, uShadowOn;
-uniform vec3 uEmisCol; uniform sampler2D uShadowMap;
-float sunShadow(){
+uniform vec3 uEmisCol; uniform sampler2D uShadowMap, uShadowMapN; uniform float uShadowTexel;
+float lookup(sampler2D map, vec4 at, float nl, float scale){
+  vec3 p = at.xyz/at.w*.5+.5;
+  float bias = (.00004 + .00022*(1.-clamp(abs(nl), 0., 1.)))*scale, s = 0.;
+  for (int i=-1;i<=1;i++) for (int j=-1;j<=1;j++) s += step(texture2D(map, p.xy + vec2(float(i), float(j))*uShadowTexel*1.25).r + bias, p.z);
+  return smoothstep(.2, .8, s/9.);
+}
+float sunShadow(float nl){
   if (uShadowOn < .5) return 0.;
-  vec3 p = vS.xyz/vS.w*.5+.5;
-  if (p.z > 1.) return 0.;
-  float edge = smoothstep(0., .05, min(min(p.x, 1.-p.x), min(p.y, 1.-p.y)));
-  float s = 0.;
-  for (int i=0;i<4;i++){ vec2 o = (vec2(float(i/2), mod(float(i),2.))-.5)/2600.; s += step(texture2D(uShadowMap, p.xy+o).r + .00004, p.z); }
-  return s*.25*edge;
+  vec3 n = vSN.xyz/vSN.w*.5+.5, f = vS.xyz/vS.w*.5+.5;
+  float inNear = smoothstep(0., .06, min(min(n.x, 1.-n.x), min(n.y, 1.-n.y)));
+  float edge = smoothstep(0., .05, min(min(f.x, 1.-f.x), min(f.y, 1.-f.y)));
+  float far = f.z > 1. ? 0. : lookup(uShadowMap, vS, nl, 1.)*edge;
+  return inNear > 0. ? mix(far, lookup(uShadowMapN, vSN, nl, .25), inNear) : far;
 }
 void main(){
   vec3 base = mix(uBase, vC, uVC);
@@ -76,7 +85,7 @@ void main(){
   vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vW);
   float nl = dot(n, uLightDir);
-  nl = mix(nl, min(nl, -.2), sunShadow());
+  nl = mix(nl, min(nl, -.2), nl > 0. ? sunShadow(nl) : 0.);
   float hemi = n.y*.5+.5;
   float b1 = smoothstep(-.06,.0,nl), b2 = smoothstep(.34,.4,nl);
   vec3 shade = base*(uShadow*(.7+.3*hemi)+uAmb*.22);
