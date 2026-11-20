@@ -55,7 +55,7 @@ has no controls, no watermark and no metadata.
 | `thermal` | White-hot inset view of tagged objects |
 | `occupancy`, `swarm`, `wind` | Sensor grid, mesh network and wind streak overlays |
 | `props` | Smooth hull lofting, detailed sailboat, fishing boat, motorboat and ferry, waterline foam, buoy, lighthouse |
-| `timeline`, `player` | Film contract, easing, trapezoid ramps, time warp, script checks, the page player with end card and embed protocol |
+| `timeline`, `player` | Film contract, easing (`smoother`, `ramp`, `pulse`, `outBack`, `bezier`), trapezoid ramps, time warp, script checks, the page player with end card and embed protocol |
 | `shots` | Shot lists: each shot owns the film until the next, with cuts, fades, dolly, orbit, hand-held drift and a list check |
 | `land`, `track` | Height-field land with painted shore or alpine palettes, plateaus, draped roads and fields; routes measured in metres, graded beds, railways, trains, glowing route lines |
 | `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |

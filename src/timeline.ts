@@ -125,3 +125,21 @@ export function timeWarp(segments: { from: number; to: number; filmFrom: number;
     return t + off;
   };
 }
+
+/** Quintic smoothstep over [0, 1]: zero velocity and acceleration at both ends. */
+export const smoother = (t: number) => { const x = clamp(t); return x * x * x * (x * (x * 6 - 15) + 10); };
+
+/** 0 to 1 linear ramp between `a` and `b`. */
+export const ramp = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
+
+/** Rises over `fade` seconds after `a` and falls over `fade` seconds before `b`. */
+export const pulse = (t: number, a: number, b: number, fade = 0.4) => ss(a, a + fade, t) * (1 - ss(b - fade, b, t));
+
+/** Eases 0 to 1 with a small overshoot, for things that pop in. */
+export const outBack = (x: number, overshoot = 1.70158) => { const t = clamp(x) - 1; return 1 + (overshoot + 1) * t * t * t + overshoot * t * t; };
+
+/** Point on a quadratic Bezier from `a` to `b` bent towards `c`. */
+export const bezier = (a: THREE.Vector3, c: THREE.Vector3, b: THREE.Vector3, t: number, out = new THREE.Vector3()) => {
+  const u = 1 - t;
+  return out.set(u * u * a.x + 2 * u * t * c.x + t * t * b.x, u * u * a.y + 2 * u * t * c.y + t * t * b.y, u * u * a.z + 2 * u * t * c.z + t * t * b.z);
+};
