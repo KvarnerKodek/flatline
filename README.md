@@ -70,6 +70,7 @@ has no controls, no watermark and no metadata.
 | `instanced` | `Inst`: thousands of copies in one draw call with per-instance colour, ink outline, wind sway and distance fade |
 | `fx`, `meadow` | Scheduled sprite bursts; a painted meadow ground with a palette |
 | `backing` | `Backings`: invisible camera-facing depth planes behind sprites, cards and banners so the ink lines of the scene behind never scribble through them |
+| `label`, `decal` | `pinned` and `pinTo`: a one-sided alpha-tested card held a little off the surface it labels, so it never clips or scribbles ink; `decal` and `softDisc`: a ground patch with a soft rim and a polygon offset, so it shows no edge and no z-fight |
 | `smoke`, `butterflies`, `fireworks` | Chimney smoke puffs, a meadow of butterflies around a focus point, opaque firework bursts with trails; each a pure function of time with its options exposed |
 | `terrain` | `paintedTerrain`: one painted landscape mesh from any height function, with flat building sites, painted paths, patchwork fields, brush streaks, cloud and sun shadow and a relief rim; `valleyHeight`, `flattenSites`, `gridAxis` |
 

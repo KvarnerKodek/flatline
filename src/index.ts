@@ -38,3 +38,5 @@ export * from './score';
 export * from './soundtrack';
 export * from './cues';
 export * from './rig';
+export * from './label';
+export * from './decal';
