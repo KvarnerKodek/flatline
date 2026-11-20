@@ -49,7 +49,7 @@ has no controls, no watermark and no metadata.
 | `toon` | Shared uniforms, painted cel shading (three bands, shadow-edge accent, waterline occlusion, tinted ink outline, day/night rim), glow sprites |
 | `mood`, `sky`, `water` | Day to night palettes, painted sky and ridges, banded sea with wakes and calm glint |
 | `clouds`, `birds` | Painted cumulus and a circling gull flock, both pure functions of time |
-| `bob` | Float objects on the same swell the water draws |
+| `bob` | Float objects on the same swell the water draws; `placeOn` rests them on any surface, `seatPose` and `seatOn` seat a vehicle on uneven ground so no wheel is buried |
 | `post` | Bloom, grade, grain, fade |
 | `hud` | Captions, chapters, scrubber, lock-on brackets and tags that stay on screen and avoid each other |
 | `thermal` | White-hot inset view of tagged objects |

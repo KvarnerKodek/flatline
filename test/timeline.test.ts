@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { bezier, checkScript, clamp, cutEase, ease, outBack, pulse, ramp, shiftCamera, smoother, ss, V } from '../src/timeline';
 import { DAWN, DAY, NIGHT, mixMood, moodTrack } from '../src/mood';
-import { Placed, place } from '../src/bob';
+import { Placed, place, seatOn, seatPose } from '../src/bob';
 import { waveHeight } from '../src/water';
 
 describe('timeline helpers', () => {
@@ -68,6 +68,32 @@ describe('floating things', () => {
     expect(p.obj.position.y).toBeCloseTo(waveHeight(12, -4, 7, 1), 9);
     place(p, { x: 12, z: -4, yaw: 0.3, speed: 2 }, 7, 0);
     expect(p.obj.position.y).toBeCloseTo(0, 9);
+  });
+});
+
+describe('seating on a surface', () => {
+  const half = { l: 3, w: 1 };
+  it('stands level on flat ground, lifted by the gap', () => {
+    const q = seatPose(() => 2, { x: 5, z: 1, yaw: 0.7 }, { half, lift: 0.25 });
+    expect(q.y).toBeCloseTo(2.25, 9);
+    expect(q.pitch).toBeCloseTo(0, 9);
+    expect(q.roll).toBeCloseTo(0, 9);
+  });
+  it('pitches up a slope along its heading and rolls across it', () => {
+    const slope = (x: number) => 0.2 * x;
+    expect(seatPose((x) => slope(x), { x: 0, z: 0, yaw: 0 }, { half, lift: 0 }).pitch).toBeCloseTo(Math.atan(0.2), 9);
+    expect(seatPose((x) => slope(x), { x: 0, z: 0, yaw: Math.PI / 2 }, { half, lift: 0 }).pitch).toBeCloseTo(0, 9);
+    expect(Math.abs(seatPose((x) => slope(x), { x: 0, z: 0, yaw: Math.PI / 2 }, { half, lift: 0 }).roll)).toBeCloseTo(Math.atan(0.2), 9);
+  });
+  it('rises over a bump between the corners so nothing is buried', () => {
+    const bump = (x: number) => (Math.abs(x) < 0.5 ? 1 : 0);
+    expect(seatPose(bump, { x: 0, z: 0, yaw: 0 }, { half, lift: 0 }).y).toBeCloseTo(1, 9);
+  });
+  it('follows the heading it is given', () => {
+    const o = new THREE.Object3D();
+    seatOn(o, () => 1, { x: 4, z: -2, yaw: 0.5, speed: 0 }, { half, lift: 0 });
+    expect(o.position.toArray()).toEqual([4, 1, -2]);
+    expect(new THREE.Vector3(1, 0, 0).applyEuler(o.rotation).z).toBeCloseTo(Math.sin(0.5), 9);
   });
 });
 
