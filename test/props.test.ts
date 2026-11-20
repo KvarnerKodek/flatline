@@ -56,3 +56,18 @@ describe('time helpers', () => {
     }
   });
 });
+
+describe('freeze', () => {
+  it('stops settled subtrees from recomputing while moving ones still follow their transforms', async () => {
+    const { freeze } = await import('../src/props');
+    const scene = new THREE.Scene(), still = new THREE.Group(), leaf = new THREE.Object3D(), mover = new THREE.Group();
+    still.position.set(5, 0, 0); still.add(leaf); leaf.position.set(1, 0, 0);
+    scene.add(still, mover);
+    freeze(scene, [mover]);
+    expect(leaf.getWorldPosition(new THREE.Vector3()).x).toBeCloseTo(6, 9);
+    still.position.x = 50; mover.position.x = 7;
+    scene.updateMatrixWorld();
+    expect(new THREE.Vector3().setFromMatrixPosition(leaf.matrixWorld).x).toBeCloseTo(6, 9);
+    expect(new THREE.Vector3().setFromMatrixPosition(mover.matrixWorld).x).toBeCloseTo(7, 9);
+  });
+});

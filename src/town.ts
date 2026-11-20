@@ -23,17 +23,24 @@ export function house(o: HouseOpts = {}): House {
   m.box(0, h / 2, 0, w, h, d, wall);
   m.box(0, 0.18, 0, w + 0.16, 0.36, d + 0.16, trim);
   if (o.base) m.box(0, -o.base / 2, 0, w + 0.5, o.base, d + 0.5, hex(0xa39c90));
-  const eave = o.eave ?? 0.5, rh = (d / 2) * pitch * 1.6, ex = w / 2 + eave, ez = d / 2 + eave, ey = h - 0.12 - (eave - 0.5) * pitch * 1.6;
-  const timber = o.upper === undefined ? wall : hex(o.upper);
-  if (o.upper !== undefined) m.box(0, st > 1 ? (2.9 + h) / 2 : h - 0.5, 0, w + 0.12, st > 1 ? h - 2.9 : 1.0, d + 0.12, timber);
-  m.c = V(0, h, 0);
+  // The roof is a slab whose underside clears the wall tops (cladding included) by 2 cm at any pitch or eave depth.
+  const eave = o.eave ?? 0.5, th = 0.18, k = pitch * 1.6, clad = o.upper === undefined ? 0 : 0.06;
+  const ex = w / 2 + eave, ez = d / 2 + eave, ridge = h + 0.02 + th + k * (d / 2 + clad), rh = ridge - h;
+  const top = (z: number) => ridge - k * Math.abs(z), under = (z: number) => top(z) - th;
+  const timber = o.upper === undefined ? wall : hex(o.upper), soffit = roof.clone().multiplyScalar(0.62), edge = roof.clone().multiplyScalar(0.8);
+  if (o.upper !== undefined) m.box(0, st > 1 ? (2.9 + h) / 2 : h - 0.5, 0, w + 2 * clad, st > 1 ? h - 2.9 : 1.0, d + 2 * clad, timber);
   for (const s of [-1, 1]) {
-    m.quad(V(-ex, ey, s * ez), V(ex, ey, s * ez), V(ex, h + rh, 0), V(-ex, h + rh, 0), roof);
-    m.quad(V(-ex, ey - 0.16, s * ez), V(ex, ey - 0.16, s * ez), V(ex, ey, s * ez), V(-ex, ey, s * ez), roof.clone().multiplyScalar(0.8));
-    m.tri(V(s * (w / 2 + 0.06), h, -d / 2), V(s * (w / 2 + 0.06), h, d / 2), V(s * (w / 2 + 0.06), h + rh * 0.92, 0), timber);
+    m.c = V(0, h, 0);
+    m.quad(V(-ex, top(ez), s * ez), V(ex, top(ez), s * ez), V(ex, ridge, 0), V(-ex, ridge, 0), roof);
+    m.quad(V(-ex, under(ez), s * ez), V(ex, under(ez), s * ez), V(ex, top(ez), s * ez), V(-ex, top(ez), s * ez), edge);
+    for (const g of [-1, 1]) m.quad(V(g * ex, under(ez), s * ez), V(g * ex, under(0), 0), V(g * ex, ridge, 0), V(g * ex, top(ez), s * ez), edge);
+    m.c = V(0, ridge + 20, 0);
+    m.quad(V(-ex, under(ez), s * ez), V(ex, under(ez), s * ez), V(ex, under(0), 0), V(-ex, under(0), 0), soffit);
+    m.c = V(0, h, 0);
+    const gx = s * (w / 2 + clad), zw = d / 2 + clad;
+    m.quad(V(gx, h, -zw), V(gx, h, zw), V(gx, under(zw), zw), V(gx, under(zw), -zw), timber);
+    m.tri(V(gx, under(zw), -zw), V(gx, under(zw), zw), V(gx, under(0), 0), timber);
   }
-  m.c = V(0, h - 1, 0);
-  m.quad(V(-ex, ey - 0.16, -ez), V(ex, ey - 0.16, -ez), V(ex, ey - 0.16, ez), V(-ex, ey - 0.16, ez), roof.clone().multiplyScalar(0.7));
   if (o.chimney ?? true) m.box(-w * 0.22, h + rh * 0.75, d * 0.18, 0.7, rh * 0.9 + 0.8, 0.7, trim);
   m.box(w / 2 + 0.03, 1.05, 0, 0.08, 2.1, 1.1, hex(o.door ?? 0x6b4a35));
   m.box(w / 2 + 0.25, 0.1, 0, 0.6, 0.2, 1.6, trim);

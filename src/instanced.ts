@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toon, hex, G, INK } from './toon';
+import { toon, hex, G, INK, HULL } from './toon';
 
 const cache = new Map<string, THREE.ShaderMaterial>();
 const shared = (key: string, make: () => THREE.ShaderMaterial) => { let m = cache.get(key); if (!m) { m = make(); cache.set(key, m); } return m; };
@@ -41,6 +41,7 @@ export function outlineI(px = 2.2, sway?: Sway): THREE.ShaderMaterial {
     side: THREE.BackSide,
   });
   if (sway) m.defines = { SWAY: '' };
+  m.userData[HULL] = true;
   return m;
 }
 

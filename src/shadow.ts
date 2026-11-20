@@ -72,7 +72,7 @@ export class SunShadow {
   private depth = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
   private focus = new THREE.Vector3();
 
-  constructor(size = 4096) {
+  constructor(size = 2048) {
     this.near = new Cascade(size);
     this.far = new Cascade(size);
     G.uShadowTexel.value = 1 / size;

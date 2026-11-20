@@ -377,3 +377,16 @@ export function lighthouse(door = 0x6b4a35): THREE.Group {
   g.userData.lamp = l;
   return g;
 }
+
+/**
+ * Settles everything under `root` that does not move: world matrices are computed once and three.js skips those
+ * subtrees on every later frame. Direct children listed in `moving` keep updating. Call it after building a scene.
+ */
+export function freeze(root: THREE.Object3D, moving: THREE.Object3D[] = []) {
+  const keep = new Set(moving);
+  root.updateMatrixWorld(true);
+  for (const child of root.children) {
+    if (keep.has(child)) continue;
+    child.traverse((o) => { o.matrixAutoUpdate = false; o.matrixWorldAutoUpdate = false; });
+  }
+}

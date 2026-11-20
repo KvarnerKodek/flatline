@@ -166,8 +166,11 @@ export const INK = hex(0x050a14);
 /** Change the colour of every ink outline (a hand-painted look wants warm brown, not black). */
 export const setInk = (h: number) => INK.copy(hex(h));
 
+/** Marks a material as an inverted-hull ink outline, so a look with screen-space ink can switch hulls off. */
+export const HULL = 'flatlineHull';
+
 export function outline(px = 2.2): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
+  const m = new THREE.ShaderMaterial({
     uniforms: { ...G, uPx: { value: px }, uInk: { value: INK } },
     vertexShader: /* glsl */ `
       uniform vec2 uRes; uniform float uPx, uOutlineK;
@@ -188,6 +191,8 @@ export function outline(px = 2.2): THREE.ShaderMaterial {
       void main(){ vec3 ink = mix(uInk*vec3(1.5,1.2,1.0)+vec3(.05,.03,.02), uInk*vec3(.9,1.1,1.8), uNight); gl_FragColor = vec4(applyFog(ink, length(cameraPosition-vW)), 1.); }`,
     side: THREE.BackSide,
   });
+  m.userData[HULL] = true;
+  return m;
 }
 
 export function glowTexture(): THREE.Texture {

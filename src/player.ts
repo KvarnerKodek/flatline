@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { G } from './toon';
+import { G, HULL } from './toon';
 import { Post } from './post';
 import { Hud } from './hud';
 import type { HudOptions } from './hud';
@@ -32,6 +32,17 @@ export function applyTheme(theme?: Theme) {
   if (!theme) return;
   if (theme.className) document.body.classList.add(...theme.className.split(/\s+/).filter(Boolean));
   for (const [k, v] of Object.entries(theme.vars ?? {})) document.documentElement.style.setProperty(k, v);
+}
+
+/** Pixels drawn per frame at most, before the device pixel ratio is lowered. */
+const PIXEL_BUDGET = 2.6e6;
+
+/** Compiles every shader up front, hidden objects included, so nothing stalls the first time it appears. */
+function precompile(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+  renderer.compile(scene, camera);
+  for (const o of hidden) o.visible = false;
 }
 
 export interface Player { seek(t: number): void; readonly duration: number; wav?(): string | Promise<string> }
@@ -68,6 +79,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   const world = await film.load(base);
   const scene = film.scene(world);
   if (film.look) applyLook(film.look);
+  if (film.look?.edges && !film.look.edges.hulls) scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m && !Array.isArray(m) && m.userData[HULL]) o.visible = false; });
   const post = new Post(renderer, scene, camera, { ...film.look?.grade, ...film.grade }, { edges: film.look?.edges, haze: film.look?.haze });
   const render3d = q.has('render');
   const embed = q.has('embed');
@@ -79,7 +91,9 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   }
 
   let W = innerWidth, Hh = innerHeight;
-  let dprCap = Math.min(devicePixelRatio || 1, W < 800 ? 1.5 : 2);
+  // Resolution is chosen once from a pixel budget so it never changes visibly mid-shot.
+  const budgetDpr = () => (render3d ? devicePixelRatio || 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2, Math.sqrt(PIXEL_BUDGET / (W * Hh)))));
+  let dprCap = budgetDpr();
   const applySize = () => {
     renderer.setPixelRatio(dprCap);
     renderer.setSize(W, Hh, false);
@@ -88,7 +102,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
     camera.aspect = W / Hh;
     camera.updateProjectionMatrix();
   };
-  addEventListener('resize', () => { W = innerWidth; Hh = innerHeight; applySize(); });
+  addEventListener('resize', () => { W = innerWidth; Hh = innerHeight; dprCap = budgetDpr(); applySize(); });
   applySize();
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -126,6 +140,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
 
   const follow = film.follow?.(world) ?? [], sun = film.sun?.(world);
   const inspect = q.get('cam')?.split(',').map(Number);
+  if (inspect) document.body.classList.add('inspect');
   const render = (now: number) => {
     G.uTime.value = film.warp ? film.warp(t) : t;
     const f = film.frame(world, film.warp ? film.warp(t) : t);
@@ -153,6 +168,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
 
   const player: Player = { seek: (s) => { t = s; render(performance.now()); }, duration: film.duration, wav: sound && (() => sound.wavBase64()) };
   window.__flatline = player;
+  precompile(renderer, scene, camera);
   render(performance.now());
   document.getElementById('boot')?.remove();
   document.title = 'ready';

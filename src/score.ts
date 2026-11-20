@@ -83,6 +83,7 @@ function* synth(score: Score, rate: number): Generator<void, Stereo> {
       const step = (hz(note.m) * Math.pow(2, cents / 1200)) / rate, tab = tb.table;
       let ph = (((cents * 0.37) % 1) + 1) % 1;
       for (let k = 0; k < len; k++) {
+        if ((k & 0xffff) === 0xffff) yield;
         const x = ph * TABLE, j = x | 0, w = tab[j] + (tab[j + 1] - tab[j]) * (x - j), y = w * env[k];
         L[i0 + k] += y * gl;
         R[i0 + k] += y * gr;
@@ -114,6 +115,7 @@ function* reverb(L: Float32Array, R: Float32Array, rate: number, mix: number): G
       const buf = new Float32Array(Math.round((len + spread) * sc));
       let j = 0, lp = 0;
       for (let i = 0; i < x.length; i++) {
+        if ((i & 0x3ffff) === 0x3ffff) yield;
         const y = buf[j];
         lp = y * 0.72 + lp * 0.28;
         buf[j] = x[i] * 0.015 + lp * 0.84;
@@ -126,6 +128,7 @@ function* reverb(L: Float32Array, R: Float32Array, rate: number, mix: number): G
       const buf = new Float32Array(Math.round((len + spread) * sc));
       let j = 0;
       for (let i = 0; i < out.length; i++) {
+        if ((i & 0x3ffff) === 0x3ffff) yield;
         const b = buf[j], y = -out[i] + b;
         buf[j] = out[i] + b * 0.5;
         out[i] = y;

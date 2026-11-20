@@ -60,3 +60,4 @@ body.letterbox .cap:not(.title){bottom:calc(var(--bar) + clamp(28px,6vh,64px))}
 body.letterbox .mark,body.letterbox .chap{top:calc(var(--bar) + clamp(12px,2vw,24px))}
 body.letterbox #ui{z-index:4}
 #hud.nomarkers .brk,#hud.nomarkers .lead{display:none}
+body.inspect #hud{display:none}

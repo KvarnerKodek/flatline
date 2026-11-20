@@ -98,11 +98,15 @@ export function figure(o: FigureOpts = {}): Figure {
   };
 }
 
-export interface CatPose { sit?: number; walk?: number; tail?: number; headYaw?: number; headPitch?: number }
+/** `blink` closes the eyes (a slow blink is a cat's hello), `paw` lifts the right forepaw in a wave, `tilt` rolls the head. */
+export interface CatPose { sit?: number; walk?: number; tail?: number; headYaw?: number; headPitch?: number; blink?: number; paw?: number; tilt?: number }
 export interface Cat { root: THREE.Group; pose(p: CatPose): void }
 
-/** A cat about 0.5 m long, feet at the origin, facing +x. `sit` goes from standing (0) to seated (1). */
-export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0x9fe870): Cat {
+/**
+ * A friendly storybook cat about 0.5 m long, feet at the origin, facing +x: a large head with round amber eyes,
+ * a pink nose and a small smile. `collar` adds a collar with a gold tag. `sit` goes from standing (0) to seated (1).
+ */
+export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: number): Cat {
   const root = new THREE.Group(), body = new THREE.Group();
   root.add(body);
   shadow(root, 0.32, 0.2);
@@ -115,19 +119,48 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0x9fe870): Cat {
     const g = new THREE.Group();
     g.position.set(x, 0.04, s * 0.07);
     part(g, new THREE.CapsuleGeometry(0.034, 0.15, 2, 6).translate(0, -0.11, 0), fur);
+    part(g, new THREE.SphereGeometry(0.04, 8, 6).scale(1.2, 0.8, 1), belly, 0.01, -0.19, 0);
     trunk.add(g);
     return g;
   });
   const head = new THREE.Group();
-  head.position.set(0.42, 0.17, 0);
+  head.position.set(0.43, 0.19, 0);
   trunk.add(head);
-  part(head, new THREE.SphereGeometry(0.115, 12, 9).scale(1, 0.9, 1.08), fur);
-  part(head, new THREE.SphereGeometry(0.05, 8, 6).scale(1, 0.75, 1.3), belly, 0.085, -0.035, 0);
+  part(head, new THREE.SphereGeometry(0.135, 14, 11).scale(0.95, 0.88, 1.12), fur);
+  part(head, new THREE.SphereGeometry(0.06, 10, 8).scale(0.9, 0.7, 1.35), belly, 0.085, -0.045, 0);
+  const lids: THREE.Mesh[] = [];
+  const bit = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); head.add(m); return m; };
   for (const s of [-1, 1]) {
-    part(head, new THREE.ConeGeometry(0.045, 0.1, 4).rotateY(Math.PI / 4), fur, -0.005, 0.115, s * 0.07);
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.021, 6, 5), new THREE.MeshBasicMaterial({ color: eye }));
-    e.position.set(0.1, 0.02, s * 0.045);
+    part(head, new THREE.ConeGeometry(0.055, 0.12, 4).rotateY(Math.PI / 4).rotateX(s * -0.25), fur, -0.01, 0.125, s * 0.075);
+    bit(new THREE.ConeGeometry(0.032, 0.075, 4).rotateY(Math.PI / 4).rotateX(s * -0.25), 0xf2a6a0, 0.012, 0.118, s * 0.073);
+    const e = new THREE.Group();
+    e.position.set(0.108, 0.022, s * 0.05);
     head.add(e);
+    e.add(new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10).scale(0.5, 1.1, 1), mat(eye)));
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8).scale(0.5, 1.15, 1), mat(0x1b0f00));
+    pupil.position.x = 0.006;
+    e.add(pupil);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 6, 5), mat(0xffffff));
+    glint.position.set(0.014, 0.012, s * -0.006);
+    e.add(glint);
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.033, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.55, 1.1, 1.06), mat(fur));
+    lid.position.x = 0.002;
+    e.add(lid);
+    lids.push(lid);
+    bit(new THREE.SphereGeometry(0.022, 8, 6).scale(0.3, 0.6, 1), 0xf29a8a, 0.11, -0.035, s * 0.078);
+    for (const k of [-1, 1]) {
+      const wsk = bit(new THREE.BoxGeometry(0.003, 0.003, 0.075), 0x6b4a35, 0.1, -0.03 + k * 0.012, s * 0.13);
+      wsk.rotation.x = s * k * 0.18;
+    }
+  }
+  bit(new THREE.SphereGeometry(0.014, 8, 6).scale(0.8, 0.7, 1.2), 0xe07a86, 0.138, -0.022, 0);
+  for (const s of [-1, 1]) {
+    const m = bit(new THREE.TorusGeometry(0.012, 0.0035, 4, 8, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI), 0x5a2e22, 0.131, -0.038, s * 0.011);
+    m.scale.setScalar(1);
+  }
+  if (collar !== undefined) {
+    part(trunk, new THREE.TorusGeometry(0.075, 0.016, 6, 16).rotateY(Math.PI / 2).rotateZ(0.9), collar, 0.34, 0.12, 0);
+    part(trunk, new THREE.CylinderGeometry(0.024, 0.024, 0.008, 14).rotateZ(Math.PI / 2).rotateY(0.15), 0xf2c14a, 0.405, 0.055, 0);
   }
   const tail: THREE.Group[] = [];
   let at: THREE.Object3D = trunk;
@@ -142,16 +175,20 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0x9fe870): Cat {
   return {
     root,
     pose(p) {
-      const sit = p.sit ?? 0, w = p.walk ?? 0, tw = p.tail ?? 0;
+      const sit = p.sit ?? 0, w = p.walk ?? 0, tw = p.tail ?? 0, paw = p.paw ?? 0;
       trunk.rotation.z = sit * 0.82;
       trunk.position.y = 0.2 - sit * 0.07;
       legs.forEach((l, i) => {
         const front = i < 2, sw = Math.sin(w + (i % 2 ? Math.PI : 0) + (front ? 0 : Math.PI)) * 0.5 * (1 - sit);
-        l.rotation.z = sw + (front ? -sit * 0.82 : sit * 0.75);
+        l.rotation.z = sw + (front ? -sit * 0.82 : sit * 0.75) + (i === 1 ? paw * (1.9 + 0.25 * Math.sin(tw * 3)) : 0);
+        l.rotation.x = i === 1 ? -paw * 0.35 : 0;
       });
       head.rotation.z = -sit * 0.72 + (p.headPitch ?? 0);
       head.rotation.y = p.headYaw ?? 0;
-      tail.forEach((g, i) => { g.rotation.z = (i ? -0.3 : -0.55 + sit * 0.4); g.rotation.y = Math.sin(tw - i * 0.7) * 0.34; });
+      head.rotation.x = p.tilt ?? 0;
+      const shut = Math.min(1, Math.max(0, p.blink ?? 0));
+      for (const l of lids) { l.visible = shut > 0.02; l.rotation.z = (1 - shut) * 1.6; }
+      tail.forEach((g, i) => { g.rotation.z = (i ? 0.22 : -0.55 + sit * 0.4) + (i > 3 ? 0.35 : 0); g.rotation.y = Math.sin(tw - i * 0.7) * 0.3; });
     },
   };
 }
