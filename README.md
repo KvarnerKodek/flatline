@@ -60,6 +60,24 @@ has no controls, no watermark and no metadata.
 | `land`, `track` | Height-field land with painted shore or alpine palettes, plateaus, draped roads and fields; routes measured in metres, graded beds, railways, trains, glowing route lines |
 | `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |
 | `motes`, `shadow` | Time-placed glows, coins and inked puffs, rain, arcs; sun shadows for every toon surface |
+| `look` | `Look` presets (`CEL`, the original crisp toon, and `GHIBLI`, hand-painted) and `applyLook` |
+| `edges` | Screen-space ink lines from depth, FXAA, distance haze and ground fog, driven by `Look.edges` and `Look.haze` |
+| `softclouds` | Painted cumulus: lit lobes with bright tops, lavender undersides and a warm rim |
+| `instanced` | `Inst`: thousands of copies in one draw call with per-instance colour, ink outline, wind sway and distance fade |
+| `fx`, `meadow` | Scheduled sprite bursts; a painted meadow ground with a palette |
+
+## Looks
+
+A `Look` bundles everything that decides how a film is drawn: band softness, painterly mottling, ink colour and thickness, highlight and rim strength, ink lines from depth, haze and the final grade. Two ship with the library; the default (no `look`) is unchanged.
+
+```ts
+import { play, Film, GHIBLI } from 'flatline';
+const film: Film<World> = { /* ... */, look: GHIBLI };   // or CEL, or your own Look
+```
+
+`GHIBLI` is hand-painted: soft band edges, brush-and-wash mottling on every surface (`G.uPaint`), warm brown ink instead of black (`setInk`), gentler highlights and rim, thin screen-space ink lines (`Look.edges`, which replace the inverted-hull outlines and also work on instanced meshes), periwinkle distance haze and valley mist (`Look.haze`, `setGroundFog`), and a grade with optional `paper` and `bleed`. Pair it with `makeSoftClouds` instead of `makeClouds`. Meshes that must not get ink lines (sprites, glows, the sky) are tagged `userData.noEdge = true`.
+
+The page chrome is themable without touching flatline's own styles: `play(film, { theme: { className: 'brand', vars: { '--accent': '#505ff1' } } })` adds a body class and CSS variables so a host stylesheet can scope its rules. `play(film, { hud: { markers: 'none' } })` drops the lock-on brackets and leader lines for films where tracked objects are not targets (the default stays brackets). Anything can rest on any surface with `placeOn(placed, pose, t, (x, z, t) => height)`; `place` is the sea version. Optional kits can be imported on their own: `flatline/sea` and `flatline/sensing`.
 
 ## Review stills
 
