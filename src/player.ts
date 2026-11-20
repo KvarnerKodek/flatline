@@ -34,7 +34,7 @@ export function applyTheme(theme?: Theme) {
   for (const [k, v] of Object.entries(theme.vars ?? {})) document.documentElement.style.setProperty(k, v);
 }
 
-export interface Player { seek(t: number): void; readonly duration: number; wav?(): string }
+export interface Player { seek(t: number): void; readonly duration: number; wav?(): string | Promise<string> }
 
 declare global {
   interface Window { __flatline?: Player }
@@ -96,7 +96,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   let playing = !reduced && !q.has('still') && !embed;
   const toggle = () => { if (t >= film.duration) t = 0; playing = !playing; hud.setPlaying(playing); };
   const hud = new Hud(film.captions, film.chapters, film.duration, toggle, (s) => { t = s; }, brand, opts.hud);
-  const sound = film.score ? new Soundtrack(film.score()) : undefined;
+  const sound = film.sound?.() ?? (film.score ? new Soundtrack(film.score()) : undefined);
   if (sound && !render3d) setTimeout(() => sound.prepare(), 1500);
   if (sound && !render3d) hud.button('Sound off', (b) => {
     b.textContent = sound.on ? 'Sound off' : 'Tuning';

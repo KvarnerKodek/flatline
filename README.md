@@ -60,6 +60,7 @@ has no controls, no watermark and no metadata.
 | `land`, `track` | Height-field land with painted shore or alpine palettes, plateaus, draped roads and fields; routes measured in metres, graded beds, railways, trains, glowing route lines |
 | `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |
 | `score`, `soundtrack` | A film score as notes, synthesised deterministically (piano, bells, pads, strings, bass, reverb) and played in sync with film time; the renderer muxes the same audio |
+| `cues` | Sound effects and generative music as cues on the film clock, synthesised with WebAudio live and offline (`voice`, `bus`, `room`); `generateCues` writes a score from layers (pads, arpeggios, melody, pulse, ambient bed) and a loudness arc; `CuePlayer` plays and exports it |
 | `motes`, `shadow` | Time-placed glows, coins and inked puffs, rain, arcs; sun shadows for every toon surface |
 | `look` | `Look` presets (`CEL`, the original crisp toon, and `GHIBLI`, hand-painted) and `applyLook` |
 | `edges` | Screen-space ink lines from depth, FXAA, distance haze and ground fog, driven by `Look.edges` and `Look.haze` |
@@ -95,6 +96,22 @@ const land = paintedTerrain({
 });
 scene.add(land.mesh);
 house.root.position.set(-120, land.stand(-120, -40), -40);
+```
+
+Sound comes either as notes (`score`, rendered by flatline's own synth) or as WebAudio cues:
+
+```ts
+import { generateCues, CuePlayer } from 'flatline';
+const cues = generateCues({
+  layers: [
+    { type: 'pad', from: 0, to: 60, every: 8, chords: [{ root: 48 }, { root: 45, minor: true }] },
+    { type: 'melody', from: 8, to: 56, root: 72, degrees: [0, 2, 4, 3, 2, 1], step: 0.8 },
+    { type: 'bed', from: 0, to: 60 },
+  ],
+  arc: [[0, 0.6], [30, 1], [60, 0.7]],
+  cues: [{ t: 12, k: 'honk', f: 220 }],        // hand-placed effects
+});
+const film = { /* ... */ sound: () => new CuePlayer(cues, 60) };   // the renderer muxes the same cues offline
 ```
 
 ## Review stills

@@ -1,11 +1,22 @@
-import { renderScore, renderScoreAsync, wav, type Score } from './score';
+import { renderScore, renderScoreAsync, wav, wavBase64, type Score } from './score';
+
+/** What the player needs from a film's sound: `Soundtrack` plays a `Score`, `CuePlayer` plays WebAudio cues. */
+export interface Sound {
+  on: boolean;
+  prepare(): void;
+  enable(on: boolean, ready?: () => void): void;
+  /** Keeps sound on the film's clock and returns the film time to show. */
+  sync(t: number, playing: boolean): number;
+  /** The whole soundtrack as a base64 WAV, for the video renderer to mux in. */
+  wavBase64(): string | Promise<string>;
+}
 
 /**
  * Plays a film's score in the page. The score renders in the background from `prepare`, and plays once the viewer
  * turns sound on (browsers allow sound only after a click). While it plays, the audio clock leads and film time follows it, so picture and sound never drift;
  * a seek or pause simply restarts the sound at the film's time.
  */
-export class Soundtrack {
+export class Soundtrack implements Sound {
   on = false;
   private ctx?: AudioContext;
   private buf?: AudioBuffer;
@@ -64,9 +75,7 @@ export class Soundtrack {
 
   /** The whole score as a base64 WAV, for the video renderer to mux in. */
   wavBase64(): string {
-    const [l, r] = renderScore(this.score, 48000), bytes = new Uint8Array(wav(l, r, 48000));
-    let s = '';
-    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(s);
+    const [l, r] = renderScore(this.score, 48000);
+    return wavBase64(wav(l, r, 48000));
   }
 }
