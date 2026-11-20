@@ -116,6 +116,15 @@ export function house(o: HouseOpts = {}): House {
     for (const g of [-1, 1]) bx(g * (ww / 2 + 0.06), cy, out, 0.1, 1.1, 0.12, frame);
     bx(0, cy, out + 0.02, 0.05, 1.0, 0.04, frame);
     bx(0, cy + 0.12, out + 0.02, ww, 0.05, 0.04, frame);
+    if (o.flowers !== undefined && cy < 2.2) {
+      const bloom = hex(o.flowers), leaf = hex(0x4f8a3e);
+      bx(0, cy - 0.72, 0.16, ww + 0.2, 0.2, 0.2, wood);
+      for (let a = -ww / 2; a <= ww / 2 + 1e-3; a += ww / 3) {
+        const [x, z] = at(a, 0.24);
+        m.ball(x, cy - 0.58, z, 0.12, leaf.clone().multiplyScalar(0.9 + r() * 0.2), 0.8);
+        m.ball(x + (r() - 0.5) * 0.08, cy - 0.5, z + (r() - 0.5) * 0.08, 0.07, bloom.clone().multiplyScalar(0.92 + r() * 0.16));
+      }
+    }
     if (sh && slat) for (const g of [-1, 1]) {
       const sa = g * (ww / 2 + 0.12 + ww * 0.26);
       bx(sa, cy, 0.05, ww * 0.5, 1.08, 0.05, sh);
