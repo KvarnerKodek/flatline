@@ -530,55 +530,84 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
   };
 }
 
-export interface CowPose { graze?: number; tail?: number; walk?: number }
+export interface CowPose { graze?: number; tail?: number; walk?: number; /** film time for chewing, breathing and ear flicks; defaults to `G.uTime` */ t?: number }
 export interface Cow { root: THREE.Group; pose(p: CowPose): void }
 
-/** A dairy cow about 2.2 m long, hooves at the origin, facing +x. `graze` lowers her head to the grass. */
+let cowSeed = 0;
+
+/**
+ * A dairy cow about 2.2 m long, hooves at the origin, facing +x. `graze` lowers her head to the grass, where she
+ * chews; legs bend at the knee and hock as she walks; ears flick and the tail swishes with a lagging tuft.
+ */
 export function cow(coat = 0xa8683c, patch = 0xfff6e6): Cow {
-  const root = new THREE.Group();
+  const seed = ++cowSeed * 3.7;
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
   shadow(root, 1.25, 0.6);
-  part(root, new THREE.CapsuleGeometry(0.46, 1.25, 4, 12).rotateZ(Math.PI / 2).translate(0, 1.12, 0), coat);
-  part(root, new THREE.SphereGeometry(0.42, 10, 8).scale(1.1, 0.8, 1.02).translate(-0.35, 1.3, 0), patch);
-  part(root, new THREE.SphereGeometry(0.3, 10, 8).scale(1.2, 0.7, 1.04).translate(0.5, 0.98, 0), patch);
-  part(root, new THREE.SphereGeometry(0.17, 8, 6).translate(-0.45, 0.66, 0), 0xf2b8b0);
+  part(body, new THREE.CapsuleGeometry(0.46, 1.25, 4, 14).rotateZ(Math.PI / 2).translate(0, 1.12, 0), coat);
+  part(body, new THREE.SphereGeometry(0.42, 12, 10).scale(1.1, 0.8, 1.02).translate(-0.35, 1.3, 0), patch);
+  part(body, new THREE.SphereGeometry(0.3, 12, 10).scale(1.2, 0.7, 1.04).translate(0.5, 0.98, 0), patch);
+  part(body, new THREE.SphereGeometry(0.17, 10, 8).translate(-0.45, 0.66, 0), 0xf2b8b0);
   const legs = [[0.72, -1], [0.72, 1], [-0.72, -1], [-0.72, 1]].map(([x, s]) => {
-    const g = new THREE.Group();
-    g.position.set(x, 0.86, s * 0.26);
-    part(g, new THREE.CapsuleGeometry(0.095, 0.6, 2, 8).translate(0, -0.42, 0), coat);
-    part(g, new THREE.CylinderGeometry(0.11, 0.12, 0.14, 8).translate(0, -0.8, 0), 0x2b2420);
-    root.add(g);
-    return g;
+    const upper = new THREE.Group(), lower = new THREE.Group();
+    upper.position.set(x, 0.86, s * 0.26);
+    lower.position.y = -0.42;
+    upper.add(lower);
+    part(upper, new THREE.CapsuleGeometry(0.11, 0.3, 3, 10).translate(0, -0.2, 0), coat);
+    part(lower, new THREE.CapsuleGeometry(0.085, 0.26, 3, 10).translate(0, -0.17, 0), coat);
+    part(lower, new THREE.CylinderGeometry(0.1, 0.12, 0.14, 10).translate(0, -0.37, 0), 0x2b2420);
+    body.add(upper);
+    return { upper, lower, front: x > 0 };
   });
   const neck = new THREE.Group();
   neck.position.set(0.98, 1.38, 0);
-  root.add(neck);
-  part(neck, new THREE.CapsuleGeometry(0.24, 0.42, 3, 10).rotateZ(-0.9).translate(0.2, 0.14, 0), coat);
+  body.add(neck);
+  part(neck, new THREE.CapsuleGeometry(0.24, 0.42, 3, 12).rotateZ(-0.9).translate(0.2, 0.14, 0), coat);
+  part(neck, new THREE.CylinderGeometry(0.13, 0.15, 0.16, 10), 0xf2c14a, 0.36, -0.2, 0);
   const head = new THREE.Group();
   head.position.set(0.5, 0.36, 0);
   neck.add(head);
-  part(head, new THREE.CapsuleGeometry(0.2, 0.3, 3, 10).rotateZ(Math.PI / 2 - 0.5).translate(0.14, -0.06, 0), patch);
-  part(head, new THREE.SphereGeometry(0.17, 8, 6).scale(1, 0.8, 1.1).translate(0.36, -0.2, 0), 0xf2b8b0);
+  part(head, new THREE.CapsuleGeometry(0.2, 0.3, 3, 12).rotateZ(Math.PI / 2 - 0.5).translate(0.14, -0.06, 0), patch);
+  const jaw = new THREE.Group();
+  jaw.position.set(0.3, -0.2, 0);
+  head.add(jaw);
+  part(jaw, new THREE.SphereGeometry(0.17, 10, 8).scale(1, 0.8, 1.1).translate(0.06, 0, 0), 0xf2b8b0);
+  const ears: THREE.Group[] = [];
   for (const s of [-1, 1]) {
     part(head, new THREE.ConeGeometry(0.05, 0.22, 6).rotateX(s * 0.7), 0xf4ecd8, -0.02, 0.2, s * 0.17);
-    part(head, new THREE.SphereGeometry(0.09, 6, 5).scale(0.5, 1, 1.5), coat, -0.06, 0.06, s * 0.27);
-    part(head, new THREE.SphereGeometry(0.035, 6, 5), 0x1b0f00, 0.24, 0.02, s * 0.17);
+    const ear = new THREE.Group();
+    ear.position.set(-0.06, 0.06, s * 0.2);
+    head.add(ear);
+    part(ear, new THREE.SphereGeometry(0.09, 8, 6).scale(0.5, 1, 1.5).translate(0, 0, s * 0.07), coat);
+    ears.push(ear);
+    part(head, new THREE.SphereGeometry(0.035, 8, 6), 0x1b0f00, 0.24, 0.02, s * 0.17);
   }
-  part(neck, new THREE.CylinderGeometry(0.13, 0.15, 0.16, 8), 0xf2c14a, 0.36, -0.2, 0);
-  const tail = new THREE.Group();
+  const tail = new THREE.Group(), tuft = new THREE.Group();
   tail.position.set(-1.08, 1.4, 0);
-  root.add(tail);
-  part(tail, new THREE.CapsuleGeometry(0.035, 0.7, 2, 6).translate(0, -0.4, 0), coat);
-  part(tail, new THREE.SphereGeometry(0.08, 6, 5).scale(1, 1.6, 1), 0x2b2420, 0, -0.82, 0);
+  tuft.position.y = -0.62;
+  body.add(tail);
+  tail.add(tuft);
+  part(tail, new THREE.CapsuleGeometry(0.035, 0.6, 2, 6).translate(0, -0.32, 0), coat);
+  part(tuft, new THREE.SphereGeometry(0.08, 8, 6).scale(1, 1.6, 1), 0x2b2420, 0, -0.12, 0);
   sealRig(root);
   return {
     root,
     pose(p) {
-      const gz = p.graze ?? 0, w = p.walk ?? 0;
+      const t = p.t ?? G.uTime.value, gz = p.graze ?? 0, w = p.walk ?? 0, walking = p.walk === undefined ? 0 : 1;
       neck.rotation.z = -gz * 1.25;
-      head.rotation.z = gz * 0.3 + Math.sin((p.tail ?? 0) * 0.6) * 0.04;
-      tail.rotation.x = Math.sin(p.tail ?? 0) * 0.5;
-      tail.rotation.z = -0.15;
-      legs.forEach((l, i) => { l.rotation.z = Math.sin(w + (i % 3 ? Math.PI : 0)) * 0.35 * (p.walk === undefined ? 0 : 1); });
+      const chew = gz > 0.5 ? Math.max(0, Math.sin(t * 6 + seed)) : 0;
+      jaw.rotation.set(Math.sin(t * 3 + seed) * 0.08 * chew, 0, -0.12 * chew);
+      head.rotation.z = gz * 0.3 + Math.sin(t * 0.5 + seed) * 0.04;
+      ears.forEach((e, i) => { const k = fract(t / 2.9 + i * 0.4 + hash(seed)), f = k < 0.08 ? Math.sin((k / 0.08) * Math.PI) : 0; e.rotation.set((i ? 1 : -1) * (0.2 + 0.5 * f), 0, 0); });
+      const swish = (p.tail ?? t * 2.2);
+      tail.rotation.set(Math.sin(swish) * 0.45, 0, -0.15);
+      tuft.rotation.set(Math.sin(swish - 0.9) * 0.6, 0, 0.1);
+      body.scale.set(1, 1 + Math.sin(t * 1.4 + seed) * 0.006, 1 + Math.sin(t * 1.4 + seed) * 0.01);
+      legs.forEach((l, i) => {
+        const a = w + (i % 3 ? Math.PI : 0), sw = Math.sin(a) * 0.35 * walking, bend = Math.max(0, Math.cos(a)) * 0.55 * walking;
+        l.upper.rotation.z = sw;
+        l.lower.rotation.z = l.front ? bend : -bend;
+      });
     },
   };
 }
