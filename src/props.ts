@@ -139,6 +139,23 @@ export function finish(m: Mesher, mat: THREE.ShaderMaterial = MAT): THREE.Group 
   return g;
 }
 
+const FOAM = new THREE.MeshBasicMaterial({ color: 0xeafcff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide });
+
+/** A thin foam collar where a hull meets the water, so a boat reads as sitting in the sea. */
+export function waterlineFoam(length: number, beam: number, y = -0.38): THREE.Group {
+  const g = new THREE.Group();
+  for (const [a, b, o] of [[0.9, 1.0, 1], [1.12, 1.2, 0.45]] as const) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(a, b, 64), FOAM);
+    m.rotation.x = -Math.PI / 2;
+    m.scale.set(length * 0.53, beam * 0.62, 1);
+    m.position.y = y;
+    m.renderOrder = 3;
+    m.userData.o = o;
+    g.add(m);
+  }
+  return g;
+}
+
 export interface Craft { root: THREE.Group; lamps: THREE.Sprite[]; length: number; rig?: THREE.Group }
 
 const FISH_ST: Station[] = [
@@ -179,6 +196,7 @@ export function fishingBoat(hullColor = 0x2b3b52, cabin = 0xd8dde4): Craft {
   for (const [bx, bz] of [[-1.2, 1.15], [-0.4, 1.2], [0.4, 1.2]]) m.cyl(bx, 0.78, bz, 1.1, 0.16, hex(0xe8742c), 8, 0.16);
   for (let i = 0; i < 4; i++) m.box(-3.1 + i * 0.5, 1.15, 0.0, 0.34, 0.3, 0.3, hex(0xd9742c));
   const root = finish(m);
+  root.add(waterlineFoam(L, 3.1));
   root.position.y = 0;
   return { root: wrap(root), lamps: [], length: L };
 }
@@ -225,6 +243,7 @@ export function sailboat(sail = 0xf5f1e4, hullC = 0xf0efe9, lights = true, sailC
   const sails = finish(sm, MAT_SAIL);
   const rig = new THREE.Group();
   rig.position.set(0.55, 0, 0);
+  root.add(waterlineFoam(L, 3.4));
   sails.position.set(-0.55, 0, 0);
   rig.add(sails);
   const w = new THREE.Group();
@@ -276,6 +295,7 @@ export function motorBoat(hullC = 0xf4f4f0, accent = 0x1d6fa8, lights = false): 
   }
   m.box(-2.6, 0.85, 0, 0.9, 0.12, 1.6, hex(0xd9d4c4));
   const root = finish(m);
+  root.add(waterlineFoam(L, 2.8));
   const lamps: THREE.Sprite[] = [];
   if (lights) {
     const mk = (c: number, x: number, y: number, z: number, s = 1.1) => { const l = glow(c, s, 0.95); l.position.set(x, y, z); root.add(l); lamps.push(l); };
@@ -293,6 +313,7 @@ export function ferry(): Craft {
   m.box(8, 12.6, 0, 14, 3.0, 8, hex(0xdfe5ea), 0.8);
   m.cyl(-12, 11, 0, 18, 1.8, hex(0xc7372f), 10);
   const root = finish(m);
+  root.add(waterlineFoam(L, 15));
   const lamps: THREE.Sprite[] = [];
   const W = toon({ color: 0xffd9a0, emissive: 0xffd9a0, emisAmt: 0.95 });
   const wm = new Mesher();

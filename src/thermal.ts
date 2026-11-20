@@ -24,7 +24,7 @@ export class Thermal {
   track(root: THREE.Object3D, heat: number) {
     root.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (!m.isMesh || (m.material as THREE.Material).side === THREE.BackSide) return;
+      if (!m.isMesh || (m.material as THREE.Material).side === THREE.BackSide || (m.material as THREE.Material).transparent) return;
       this.hot(m, heat);
     });
   }

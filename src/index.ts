@@ -12,3 +12,4 @@ export * from './props';
 export * from './timeline';
 export * from './player';
 export * from './wind';
+export * from './clouds';
