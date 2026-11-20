@@ -120,7 +120,8 @@ export class Hud {
       n.b.style.cssText = `--c:${tr.color};opacity:${o};transform:translate(${x}px,${y}px) scale(${sc}) rotate(${(1 - tr.lock) * 45}deg)`;
       const html = `<b>${tr.title}</b>${tr.lines.join('<br>')}`;
       if (n.tag.innerHTML !== html) { n.tag.innerHTML = html; n.w = n.tag.offsetWidth; }
-      const tx = Math.min(Math.max(x + (tr.dx ?? tr.size * 46), 8), Math.max(8, w - (n.w ?? 0) - 8)), let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), 48), h * 0.62);
+      const tx = Math.min(Math.max(x + (tr.dx ?? tr.size * 46), 8), Math.max(8, w - (n.w ?? 0) - 8));
+      let ty = Math.min(Math.max(y + (tr.dy ?? -tr.size * 56), 48), h * 0.62);
       const shown = o * Math.min(1, Math.max(0, (tr.lock - 0.6) * 3));
       if (shown > 0.05) {
         for (const p of placed) if (tx < p.x + p.w + 6 && p.x < tx + (n.w ?? 0) + 6 && Math.abs(ty - p.y) < TAG_H) ty = p.y + (ty >= p.y ? TAG_H : -TAG_H);
