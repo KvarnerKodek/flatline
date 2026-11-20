@@ -26,6 +26,16 @@ export interface EdgeOpts {
 
 export const DEFAULT_EDGES: Required<EdgeOpts> = { strength: 0.85, thickness: 1.1, depth: 0.04, normal: 0.55, fade: [260, 1500], foliage: 0.5, hulls: false };
 
+/**
+ * The material whose settings a mesh is drawn with in the depth pass, or nothing if it stays out (see-through or
+ * additive). A mesh with several materials, such as a coin with a face and a rim, is drawn when all of them are opaque.
+ */
+export function depthSource(m: THREE.Material | THREE.Material[] | undefined): THREE.Material | undefined {
+  const list = Array.isArray(m) ? m : m ? [m] : [];
+  if (!list.length || list.some((x) => x.transparent || x.blending === THREE.AdditiveBlending || x.opacity < 1)) return undefined;
+  return list[0];
+}
+
 export const resolveEdges = (o: EdgeOpts = {}): Required<EdgeOpts> => ({ ...DEFAULT_EDGES, ...o });
 /** Line width in device pixels for a render of `heightPx` pixels, so 1080p lines look like 720p lines. */
 export const edgePx = (thickness: number, heightPx: number) => (thickness * heightPx) / 720;
@@ -191,9 +201,7 @@ export class EdgePass extends Pass {
   }
 
   private skipped(o: THREE.Object3D): boolean {
-    const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-    if (!(o as THREE.Mesh).isMesh || !m || Array.isArray(m)) return true;
-    return m.transparent || m.blending === THREE.AdditiveBlending || m.opacity < 1;
+    return !(o as THREE.Mesh).isMesh || !depthSource((o as THREE.Mesh).material);
   }
 
   /** Collect what the depth pass draws and hide the hull outlines. Call once per frame before the composer renders. */
@@ -224,7 +232,7 @@ export class EdgePass extends Pass {
     u.uStrength.value = this.opts.strength; u.uDepthK.value = this.opts.depth; u.uNormK.value = this.opts.normal; u.uFade.value.set(...this.opts.fade); u.uFol.value = this.opts.foliage; u.uEdges.value = this.lines ? 1 : 0;
 
     for (const s of this.swaps) {
-      const m = s.mat as THREE.Material, def = (m as THREE.ShaderMaterial).defines;
+      const m = depthSource(s.mat)!, def = (m as THREE.ShaderMaterial).defines;
       s.o.material = this.depthMat(m, !!def && ('SWAY' in def || 'FADE' in def));
     }
     for (const h of this.hidden) h.visible = false;

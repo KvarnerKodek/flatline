@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_EDGES, distanceFade, edgePx, edgeWeight, resolveEdges } from '../src/edges';
+import { DEFAULT_EDGES, depthSource, distanceFade, edgePx, edgeWeight, resolveEdges } from '../src/edges';
 import { applyLook, CEL, GHIBLI } from '../src/look';
 import { G } from '../src/toon';
 
@@ -26,5 +26,17 @@ describe('edges', () => {
     applyLook(GHIBLI); expect(G.uOutlineK.value).toBe(0);
     applyLook({ ...GHIBLI, edges: { hulls: true } }); expect(G.uOutlineK.value).toBe(GHIBLI.outline);
     applyLook(CEL); expect(G.uOutlineK.value).toBe(1);
+  });
+});
+
+describe('depth pass membership', () => {
+  it('draws opaque meshes, including ones with several materials, and leaves see-through ones out', async () => {
+    const THREE = await import('three');
+    const a = new THREE.MeshBasicMaterial(), b = new THREE.MeshBasicMaterial(), glass = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5 });
+    expect(depthSource(a)).toBe(a);
+    expect(depthSource([a, b])).toBe(a);
+    expect(depthSource([a, glass])).toBeUndefined();
+    expect(depthSource(new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending }))).toBeUndefined();
+    expect(depthSource(undefined)).toBeUndefined();
   });
 });
