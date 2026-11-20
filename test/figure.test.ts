@@ -168,3 +168,19 @@ describe('walk', () => {
     expect(lifted).toBeGreaterThan(0.12);
   });
 });
+
+describe('hold', () => {
+  it('keeps a held prop in the palm through any pose, a grip target or a walk, and lets it go', () => {
+    const f = figure({ outfit: 'dirndl' }), phone = new THREE.Object3D(), scene = new THREE.Scene();
+    scene.add(f.root);
+    f.hold('R', phone);
+    const at = (o: THREE.Object3D) => new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    for (const p of [{ armR: 1.7 }, { gripR: new THREE.Vector3(0.4, 1.4, 0.3) }, { walk: 1.1, stride: 0.5 }, {}]) {
+      f.pose({ ...p, t: 1 });
+      scene.updateMatrixWorld(true);
+      expect(at(phone).distanceTo(at(f.handR))).toBeLessThan(0.03);
+    }
+    f.hold('R', null);
+    expect(phone.parent).toBeNull();
+  });
+});

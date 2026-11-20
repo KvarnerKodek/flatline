@@ -60,6 +60,12 @@ export interface Figure {
    * given, the palms take its sides, `halfWidth` metres either side of its centre. Pass null to let go.
    */
   carry(o: THREE.Object3D | null, halfWidth?: number): void;
+  /**
+   * Puts `prop` in a hand: it is parented to that palm with its grip point (its own origin, shifted by `offset`) in
+   * the palm and the fingers curled round it, so it follows the hand through any pose or grip. Pass null to empty
+   * the hand. Typical props: a phone (screen facing +z) held up to show, a bill, a loaf.
+   */
+  hold(hand: 'L' | 'R', prop: THREE.Object3D | null, offset?: THREE.Vector3): void;
   /** The skeleton, for films that need a joint: `legs[i].ankle`, `arms[i].wr` and so on (index 0 is left). */
   joints: { pelvis: THREE.Group; spine: THREE.Group; neck: THREE.Group; head: THREE.Group; legs: { hip: THREE.Group; knee: THREE.Group; ankle: THREE.Group }[]; arms: { sh: THREE.Group; el: THREE.Group; wr: THREE.Group }[] };
 }
@@ -272,9 +278,19 @@ export function figure(o: FigureOpts = {}): Figure {
   };
 
   let carried: THREE.Object3D | null = null, carryHalf = 0.3;
+  const heldBy: (THREE.Object3D | null)[] = [null, null];
   const side = new THREE.Vector3(), lateral = new THREE.Vector3(), gripAt = [new THREE.Vector3(), new THREE.Vector3()];
   return {
     carry(o, halfWidth = 0.3) { carried = o; carryHalf = halfWidth; },
+    hold(hand, prop, offset) {
+      const i = hand === 'L' ? 0 : 1, palm = arms[i].palm;
+      if (heldBy[i] && heldBy[i] !== prop) heldBy[i]!.removeFromParent();
+      heldBy[i] = prop;
+      if (!prop) return;
+      palm.add(prop);
+      prop.position.copy(offset ?? new THREE.Vector3(0.012, -0.015, 0));
+      prop.rotation.set(0, 0, 0);
+    },
     root, hand: arms[1].palm, handL: arms[0].palm, handR: arms[1].palm, joints: { pelvis, spine, neck, head, legs, arms },
     pose(p) {
       const t = p.t ?? G.uTime.value, w = p.walk ?? 0, st = Math.min(1.2, Math.max(0, p.stride ?? 0));
@@ -335,7 +351,7 @@ export function figure(o: FigureOpts = {}): Figure {
       arms.forEach((a, i) => {
         const R = i === 1, grip = (R ? p.gripR : p.gripL) ?? (carrying ? gripAt[i] : undefined);
         const armA = (R ? p.armR : p.armL) ?? 0, reach = (R ? p.reachR : p.reachL) ?? 0, holding = Math.min(1, Math.max(0, (armA - 0.6) / 0.7)), counter = -Math.sin(ph(i)) * st * 0.8 * (1 - 0.85 * holding);
-        const curl = (R ? p.curlR : p.curlL) ?? (grip ? 0.85 : 0.25 + 0.05 * breath * life);
+        const curl = (R ? p.curlR : p.curlL) ?? (heldBy[i] ? 0.7 : grip ? 0.85 : 0.25 + 0.05 * breath * life);
         a.fingers.rotation.set(0, 0, curl * 1.5);
         a.thumb.rotation.set(a.s * 0.5, 0, 0.6 + curl * 0.6);
         if (grip) { reachTo(a, grip); return; }
