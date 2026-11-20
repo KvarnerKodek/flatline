@@ -64,8 +64,16 @@ export interface Figure {
   joints: { pelvis: THREE.Group; spine: THREE.Group; neck: THREE.Group; head: THREE.Group; legs: { hip: THREE.Group; knee: THREE.Group; ankle: THREE.Group }[]; arms: { sh: THREE.Group; el: THREE.Group; wr: THREE.Group }[] };
 }
 
-const UP = 0.38, FORE = 0.38, FOOT = 0.06, HIPS = 0.82, ARM_U = 0.26, ARM_F = 0.24, PALM = 0.065;
+const UP = 0.38, FORE = 0.38, FOOT = 0.06, HIPS = 0.82, ARM_U = 0.26, ARM_F = 0.24, PALM = 0.065, DUTY = 0.58;
+/** Half the step length for a stride. */
+const gaitHalf = (stride: number) => 0.34 * Math.min(1.2, Math.max(0, stride)) / 0.5 * 0.5 * 1.2;
+/**
+ * Metres a figure travels per radian of `walk` phase at `stride`. Move a walking figure's root this far per radian
+ * (distance = walkSpeed(stride) * walk) and its stance feet stay planted on the ground with no sliding.
+ */
+export const walkSpeed = (stride: number) => (2 * gaitHalf(stride)) / (DUTY * Math.PI * 2);
 const fract = (x: number) => x - Math.floor(x);
+const smooth01 = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 const hash = (x: number) => fract(Math.sin(x * 127.1) * 43758.5453);
 let figureSeed = 0;
 
@@ -273,26 +281,44 @@ export function figure(o: FigureOpts = {}): Figure {
       const life = (p.idle ?? 1) * (1 - Math.min(1, st * 2.5)), still = 1 - Math.min(1, st * 2.5);
       const ph = (i: number) => w + (i ? Math.PI : 0);
 
-      // Legs: swing, knee flex peaking mid-swing, heel strike and toe-off; then the body drops so the stance foot is planted.
-      let lowest = Infinity;
-      legs.forEach((l, i) => {
-        const a = ph(i), swing = Math.sin(a) * st * 0.95, flex = st * (0.12 + 1.15 * Math.pow(Math.max(0, Math.cos(a)), 1.4));
-        l.hip.rotation.set(0, 0, swing + flex * 0.35);
-        l.knee.rotation.set(0, 0, -flex);
-        l.ankle.rotation.set(0, 0, st * (0.55 * Math.max(0, Math.sin(a)) - 0.6 * Math.max(0, -Math.sin(a + 0.5))) + flex * 0.65 - flex * 0.35);
+      // Legs: each foot follows a gait path (planted and sliding back at ground speed through stance, lifted and arcing
+      // forward through swing) and the leg reaches it with two-bone IK; the pelvis sits as high as both legs allow,
+      // which gives the walk its natural bob. With `walkSpeed(stride)` metres per radian of travel, stance feet stay put.
+      const A = gaitHalf(st), lift = 0.11 * Math.min(1, st * 2);
+      pelvis.rotation.set(Math.sin(w) * st * 0.08, -Math.sin(w) * st * 0.12, 0);
+      const foot = legs.map((l, i) => {
+        const u = fract(ph(i) / (Math.PI * 2) + 0.25);
+        if (u < DUTY) return { x: A - (2 * A * u) / DUTY, y: 0, pitch: 0 };
+        const k = (u - DUTY) / (1 - DUTY), e = k * k * (3 - 2 * k);
+        return { x: -A + 2 * A * e, y: lift * Math.sin(Math.PI * k), pitch: st * (0.7 * Math.sin(Math.PI * Math.min(1, k * 1.6)) - 0.45 * smooth01((k - 0.75) / 0.25)) };
       });
-      body.position.set(0, 0, Math.sin(w) * st * 0.035);
-      pelvis.rotation.set(Math.sin(w) * st * 0.1, -Math.sin(w) * st * 0.12, 0);
+      let h = HIPS;
+      for (const f of foot) h = Math.min(h, FOOT + f.y + Math.sqrt(Math.max(0, (UP + FORE) * (UP + FORE) * 0.996 - f.x * f.x)));
+      h -= Math.sin(w * 2) * 0.004 * st;
+      body.position.set(0, 0, 0);
+      pelvis.position.y = h;
       body.updateMatrix();
       root.updateMatrixWorld(true);
-      const toBody = inv.copy(root.matrixWorld).invert();
+      legs.forEach((l, i) => {
+        const f = foot[i];
+        d.set(f.x, FOOT + f.y, l.s * 0.11).applyMatrix4(body.matrixWorld).applyMatrix4(inv.copy(pelvis.matrixWorld).invert()).sub(l.hip.position);
+        const dx = d.x, dy = d.y, D = Math.min(Math.hypot(dx, dy), (UP + FORE) * 0.9995);
+        const phi = Math.atan2(dx, -dy), alpha = Math.acos(Math.min(1, Math.max(-1, (UP * UP + D * D - FORE * FORE) / (2 * UP * D))));
+        const knee = Math.PI - Math.acos(Math.min(1, Math.max(-1, (UP * UP + FORE * FORE - D * D) / (2 * UP * FORE))));
+        l.hip.rotation.set(0, 0, phi + alpha);
+        l.knee.rotation.set(0, 0, -knee);
+        l.ankle.rotation.set(0, 0, -(phi + alpha - knee) - pelvis.rotation.z + f.pitch);
+      });
+      root.updateMatrixWorld(true);
+      let lowest = Infinity;
+      const toBody = inv.copy(body.matrixWorld).invert();
       for (const l of legs) for (const m of l.sole) lowest = Math.min(lowest, d.setFromMatrixPosition(m.matrixWorld).applyMatrix4(toBody).y);
-      body.position.y = -lowest;
+      if (st < 0.01) body.position.y = -lowest;
 
       // Pelvis roll and the upper body: counter-twist, bow, breathing and a slow weight shift over planted feet.
       const shift = Math.sin(t * 0.37 + seed) * 0.6 + Math.sin(t * 0.83 + seed * 2) * 0.4, breath = Math.sin(t * 1.7 + seed);
       spine.rotation.set(-pelvis.rotation.x * 0.9 + shift * 0.035 * life, Math.sin(w) * st * 0.3, -(p.bow ?? 0) - st * 0.08);
-      spine.position.set(0, 0, shift * 0.015 * life);
+      spine.position.set(0, 0, shift * 0.015 * life + Math.sin(w) * st * 0.035);
       spine.scale.set(1 + breath * 0.006 * life, 1 + breath * 0.012 * life, 1 + breath * 0.006 * life);
       const skirt = pelvis.userData.skirt as THREE.Group | undefined;
       if (skirt) { skirt.rotation.set(Math.sin(w - 0.9) * st * 0.12 + shift * 0.02 * life, 0, -Math.sin(w * 2 - 1.2) * st * 0.05); skirt.scale.set(1 + st * 0.05, 1, 1 + st * 0.05); }
@@ -612,7 +638,6 @@ export function cow(coat = 0xa8683c, patch = 0xfff6e6): Cow {
   };
 }
 
-const smooth01 = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
 /**
  * A gesture curve from 0 to 1 over `dur` seconds from `t0`, acted rather than tweened: a small wind-up the other

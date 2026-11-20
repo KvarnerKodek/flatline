@@ -147,3 +147,24 @@ describe('idle life', () => {
     expect(rb.join()).not.toEqual(ra.join());
   });
 });
+
+describe('walk', () => {
+  it('keeps each stance foot fixed on the ground while the body travels at walkSpeed', async () => {
+    const { walkSpeed } = await import('../src/figure');
+    const f = figure({ outfit: 'lederhosen' }), v = walkSpeed(0.5);
+    const at = (i: number) => new THREE.Vector3().setFromMatrixPosition(f.joints.legs[i].ankle.matrixWorld);
+    let worst = 0, lifted = 0;
+    const prev: (THREE.Vector3 | null)[] = [null, null];
+    for (let w = 0; w < Math.PI * 4; w += 0.05) {
+      f.root.position.x = v * w;
+      f.pose({ walk: w, stride: 0.5, t: 0 });
+      f.root.updateMatrixWorld(true);
+      for (const i of [0, 1]) {
+        const p = at(i);
+        if (p.y < 0.065) { if (prev[i]) worst = Math.max(worst, p.distanceTo(prev[i]!)); prev[i] = p; } else { prev[i] = null; lifted = Math.max(lifted, p.y); }
+      }
+    }
+    expect(worst).toBeLessThan(0.006);
+    expect(lifted).toBeGreaterThan(0.12);
+  });
+});
