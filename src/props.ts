@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, outline, glow, hex } from './toon';
 
 const MAT = toon({ vertexColors: true, spec: 0.1 });
@@ -389,4 +389,57 @@ export function freeze(root: THREE.Object3D, moving: THREE.Object3D[] = []) {
     if (keep.has(child)) continue;
     child.traverse((o) => { o.matrixAutoUpdate = false; o.matrixWorldAutoUpdate = false; });
   }
+}
+
+/**
+ * Merges the settled scenery under `root` into a few meshes: every visible mesh outside `moving` that shares a
+ * material, layers, render order and flags with others nearby is baked into world space and joined with them, one
+ * mesh per material per `cell`-metre tile, so frustum culling still works. A mesh alone in its group stays as it
+ * is (and keeps any per-object material a film animates). Then everything settled is frozen. Returns how many
+ * meshes were merged away.
+ */
+export function bake(root: THREE.Object3D, moving: THREE.Object3D[] = [], cell = 220): number {
+  const keep = new Set(moving);
+  root.updateMatrixWorld(true);
+  const groups = new Map<string, { meshes: THREE.Mesh[]; noEdge: boolean }>();
+  const centre = new THREE.Vector3();
+  const visit = (o: THREE.Object3D, noEdge: boolean) => {
+    if (!o.visible) return;
+    noEdge ||= !!o.userData.noEdge;
+    const m = o as THREE.Mesh, mat = m.material as THREE.Material | undefined;
+    if (m.isMesh && !(m as THREE.InstancedMesh).isInstancedMesh && mat && !Array.isArray(mat) && m.geometry && !o.children.length && m.matrixWorld.determinant() > 0 && !Object.keys(m.geometry.morphAttributes).length) {
+      const g = m.geometry;
+      g.computeBoundingSphere();
+      centre.copy(g.boundingSphere!.center).applyMatrix4(m.matrixWorld);
+      const attrs = Object.keys(g.attributes).sort().map((k) => `${k}${g.attributes[k].itemSize}`).join(',');
+      const key = [mat.uuid, m.layers.mask, m.renderOrder, m.frustumCulled, noEdge, !!o.userData.noShadow, attrs, !!g.index, Math.floor(centre.x / cell), Math.floor(centre.z / cell)].join('|');
+      let e = groups.get(key);
+      if (!e) groups.set(key, (e = { meshes: [], noEdge }));
+      e.meshes.push(m);
+    }
+    for (const c of o.children) visit(c, noEdge);
+  };
+  for (const child of root.children) if (!keep.has(child)) visit(child, false);
+  let merged = 0;
+  for (const { meshes, noEdge } of groups.values()) {
+    if (meshes.length < 2) continue;
+    const g = mergeGeometries(meshes.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld)));
+    if (!g) continue;
+    const first = meshes[0], out = new THREE.Mesh(g, first.material);
+    out.layers.mask = first.layers.mask;
+    out.renderOrder = first.renderOrder;
+    out.frustumCulled = first.frustumCulled;
+    if (noEdge) out.userData.noEdge = true;
+    if (first.userData.noShadow) out.userData.noShadow = true;
+    for (const m of meshes) m.removeFromParent();
+    root.add(out);
+    merged += meshes.length - 1;
+  }
+  const prune = (o: THREE.Object3D) => {
+    for (const c of [...o.children]) prune(c);
+    if (!o.children.length && (o.type === 'Group' || o.type === 'Object3D')) o.removeFromParent();
+  };
+  for (const c of [...root.children]) if (!keep.has(c)) prune(c);
+  freeze(root, moving);
+  return merged;
 }

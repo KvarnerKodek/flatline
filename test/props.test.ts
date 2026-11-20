@@ -71,3 +71,31 @@ describe('freeze', () => {
     expect(new THREE.Vector3().setFromMatrixPosition(mover.matrixWorld).x).toBeCloseTo(7, 9);
   });
 });
+
+describe('bake', () => {
+  it('merges settled meshes that share a material into one per tile, in world space, and leaves moving ones alone', async () => {
+    const { bake } = await import('../src/props');
+    const scene = new THREE.Scene(), mat = new THREE.MeshBasicMaterial(), other = new THREE.MeshBasicMaterial();
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const a = new THREE.Group(); a.position.set(10, 0, 0); a.add(new THREE.Mesh(box, mat));
+    const b = new THREE.Mesh(box, mat); b.position.set(0, 0, 5);
+    const lone = new THREE.Mesh(box, other); lone.position.set(3, 0, 0);
+    const far = new THREE.Mesh(box, mat); far.position.set(1000, 0, 0);
+    const mover = new THREE.Mesh(box, mat);
+    scene.add(a, b, lone, far, mover);
+    expect(bake(scene, [mover], 100)).toBe(1);
+    const meshes: THREE.Mesh[] = [];
+    scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+    expect(meshes.length).toBe(4);
+    expect(meshes as THREE.Object3D[]).toContain(lone);
+    expect(meshes as THREE.Object3D[]).toContain(far);
+    expect(meshes as THREE.Object3D[]).toContain(mover);
+    const merged = meshes.find((m) => !([lone, far, mover] as THREE.Mesh[]).includes(m))!;
+    merged.geometry.computeBoundingBox();
+    expect(merged.geometry.boundingBox!.min.toArray()).toEqual([-0.5, -0.5, -0.5]);
+    expect(merged.geometry.boundingBox!.max.toArray()).toEqual([10.5, 0.5, 5.5]);
+    expect(merged.matrixAutoUpdate).toBe(false);
+    expect(mover.matrixAutoUpdate).toBe(true);
+    expect(a.parent).toBeNull();
+  });
+});
