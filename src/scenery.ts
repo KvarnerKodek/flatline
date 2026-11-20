@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Inst } from './instanced';
 import { HeightFn } from './land';
 import { Mesher, finish } from './props';
@@ -135,4 +136,36 @@ export function windmill(o: WindmillOpts = {}): Windmill {
   root.add(blades);
   root.scale.setScalar(k);
   return { root, blades, spin: (t, rpm) => { blades.rotation.z = sailAngle(t, rpm); } };
+}
+
+/** A tuft of grass: `blades` curved, tapering blades fanned round the origin, about 1 m tall before scaling. */
+export function grassTuft(blades = 6, seed = 3): THREE.BufferGeometry {
+  const r = rng(seed), parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < blades; i++) {
+    const a = (i / blades) * TAU + r() * 0.6, lean = 0.25 + r() * 0.35, h = 0.6 + r() * 0.5, w = 0.07 + r() * 0.04;
+    const pos: number[] = [], seg = 3;
+    for (let k = 0; k <= seg; k++) {
+      const t = k / seg, x = lean * t * t, y = h * t, half = w * (1 - t) + 0.005;
+      pos.push(x, y, -half, x, y, half);
+    }
+    const idx: number[] = [];
+    for (let k = 0; k < seg; k++) { const q = k * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.rotateY(a);
+    parts.push(g);
+  }
+  const g = mergeGeometries(parts)!;
+  const n = g.getAttribute('position').count, nor = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) nor.set([0, 1, 0], i * 3);
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return g;
+}
+
+/** A wildflower: a thin stem and a small round head, about 0.5 m tall before scaling. */
+export function flowerHead(seed = 5): THREE.BufferGeometry {
+  const r = rng(seed), stem = new THREE.CylinderGeometry(0.012, 0.016, 0.42, 4).translate(0, 0.21, 0), head = new THREE.IcosahedronGeometry(0.07 + r() * 0.02, 0).scale(1, 0.7, 1).translate(0, 0.45, 0);
+  stem.deleteAttribute('uv'); head.deleteAttribute('uv');
+  return mergeGeometries([stem.toNonIndexed(), head])!;
 }
