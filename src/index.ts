@@ -37,3 +37,4 @@ export * from './backing';
 export * from './score';
 export * from './soundtrack';
 export * from './cues';
+export * from './rig';

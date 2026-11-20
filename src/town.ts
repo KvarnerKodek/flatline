@@ -6,7 +6,9 @@ import { Mesher, finish } from './props';
 const rng = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
-export interface HouseOpts { w?: number; d?: number; h?: number; roof?: number; wall?: number; pitch?: number; chimney?: boolean; door?: number; storeys?: number; base?: number; upper?: number; balcony?: boolean; flowers?: number; eave?: number }
+export interface HouseOpts { w?: number; d?: number; h?: number; roof?: number; wall?: number; pitch?: number; chimney?: boolean; door?: number; storeys?: number; base?: number;
+  /** Houses whose windows never light can share one `darkGlass()` material, so a whole town draws in a few calls. */
+  glass?: THREE.ShaderMaterial; upper?: number; balcony?: boolean; flowers?: number; eave?: number }
 export interface House { root: THREE.Group; glass: THREE.ShaderMaterial; lamp: THREE.Sprite; height: number }
 
 const DARK_GLASS = hex(0x27384d), WARM_GLASS = hex(0xffd591);
@@ -60,22 +62,29 @@ export function house(o: HouseOpts = {}): House {
     for (const sg of [-1, 1]) for (const x of [-w * 0.25, w * 0.25]) gm.box(x, y, sg * (d / 2 + 0.04), 0.9, 1.0, 0.06, hex(0xffffff));
     gm.box(-w / 2 - 0.04, y, 0, 0.06, 1.0, 0.9, hex(0xffffff));
   }
-  const glass = toon({ color: 0x27384d, emissive: 0xffc46b, emisAmt: 0, spec: 0.5 });
-  root.add(new THREE.Mesh(gm.geo().crisp, glass));
+  const glass = o.glass ?? darkGlass();
+  const panes = new THREE.Mesh(gm.geo().crisp, glass);
+  panes.userData.noShadow = true;
+  root.add(panes);
   const fm = new Mesher();
   for (let s = 0; s < st; s++) for (const sg of [-1, 1]) for (const x of [-w * 0.25, w * 0.25]) fm.box(x, 0.98 + s * 2.9, sg * (d / 2 + 0.08), 1.1, 0.1, 0.16, trim);
   root.add(finish(fm));
   const lamp = glow(0xffb85c, Math.max(w, d) * 1.7, 0);
+  lamp.visible = false;
   lamp.position.set(w * 0.3, 1.6, 0);
   root.add(lamp);
   return { root, glass, lamp, height: h + rh };
 }
+
+/** Unlit window glass; pass one to many houses through `HouseOpts.glass`. */
+export const darkGlass = () => toon({ color: 0x27384d, emissive: 0xffc46b, emisAmt: 0, spec: 0.5 });
 
 /** 0 dark, 1 lit from inside. */
 export function lightHouse(hs: House, a: number) {
   (hs.glass.uniforms.uBase.value as THREE.Vector3).lerpVectors(DARK_GLASS, WARM_GLASS, a);
   hs.glass.uniforms.uEmis.value = a * 0.85;
   hs.lamp.material.opacity = a * 0.22;
+  hs.lamp.visible = a > 0.001;
 }
 
 /** A plank pier running along +x from the origin, standing on piles. */

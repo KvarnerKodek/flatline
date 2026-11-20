@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { G, toon, outline } from './toon';
+import { G, toon } from './toon';
+import { outlineI } from './instanced';
 
 /**
  * A cloud of glowing points a film places itself: fireflies, sparks, coins, lanterns, snow. The film writes
@@ -155,29 +156,35 @@ export class Arc {
  */
 export class Puffs {
   group = new THREE.Group();
-  private items: THREE.Group[] = [];
+  private body: THREE.InstancedMesh;
+  private ink: THREE.InstancedMesh;
+  private m = new THREE.Matrix4();
+  private q = new THREE.Quaternion();
+  private p = new THREE.Vector3();
+  private s = new THREE.Vector3();
   private n = 0;
 
-  constructor(max: number, color = 0xffffff, ink = 1.4) {
-    const g = new THREE.IcosahedronGeometry(1, 2), mat = toon({ color, spec: 0, emissive: color, emisAmt: 0.22 }), line = outline(ink);
-    for (let i = 0; i < max; i++) {
-      const p = new THREE.Group();
-      p.add(new THREE.Mesh(g, mat), new THREE.Mesh(g, line));
-      p.visible = false;
-      this.group.add(p);
-      this.items.push(p);
-    }
+  /** All puffs are one instanced mesh, so a chimney full of smoke is a single draw. */
+  constructor(private max: number, color = 0xffffff, ink = 1.4) {
+    const g = new THREE.IcosahedronGeometry(1, 2);
+    this.body = new THREE.InstancedMesh(g, toon({ color, spec: 0, emissive: color, emisAmt: 0.22 }), max);
+    this.ink = new THREE.InstancedMesh(g, outlineI(ink), max);
+    for (const m of [this.body, this.ink]) { m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+    this.group.add(this.body, this.ink);
+    this.group.visible = false;
   }
 
   begin() { this.n = 0; }
 
   add(x: number, y: number, z: number, size: number) {
-    if (this.n >= this.items.length || size <= 0.01) return;
-    const p = this.items[this.n++];
-    p.visible = true;
-    p.position.set(x, y, z);
-    p.scale.set(size, size * 0.82, size);
+    if (this.n >= this.max || size <= 0.01) return;
+    this.m.compose(this.p.set(x, y, z), this.q, this.s.set(size, size * 0.82, size));
+    this.body.setMatrixAt(this.n, this.m);
+    this.ink.setMatrixAt(this.n++, this.m);
   }
 
-  end() { for (let i = this.n; i < this.items.length; i++) this.items[i].visible = false; }
+  end() {
+    for (const m of [this.body, this.ink]) { m.count = this.n; m.instanceMatrix.needsUpdate = true; }
+    this.group.visible = this.n > 0;
+  }
 }

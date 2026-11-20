@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toon, outline } from './toon';
+import { sealRig } from './rig';
 
 const INK = outline(1.7);
 const mats = new Map<number, THREE.ShaderMaterial>();
@@ -10,6 +11,7 @@ function part(parent: THREE.Object3D, g: THREE.BufferGeometry, color: number, x 
   const p = new THREE.Group();
   p.add(new THREE.Mesh(g, mat(color)), new THREE.Mesh(g, INK));
   p.position.set(x, y, z);
+  p.userData.rigid = true;
   parent.add(p);
   return p;
 }
@@ -115,6 +117,7 @@ export function figure(o: FigureOpts = {}): Figure {
     part(head, new THREE.CylinderGeometry(0.44, 0.46, 0.035, 18), o.hat, 0, 0.15, 0);
     part(head, new THREE.CylinderGeometry(0.17, 0.21, 0.17, 14), o.hat, 0, 0.24, 0);
   }
+  sealRig(root);
   return {
     root, hand: aR.hand,
     pose(p) {
@@ -241,6 +244,7 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
     part(seated, new THREE.CylinderGeometry(0.024, 0.024, 0.008, 14).rotateZ(Math.PI / 2), 0xf2c14a, 0.112, 0.28, 0);
   }
 
+  sealRig(root);
   return {
     root,
     pose(p) {
@@ -329,6 +333,7 @@ export function cow(coat = 0xa8683c, patch = 0xfff6e6): Cow {
   root.add(tail);
   part(tail, new THREE.CapsuleGeometry(0.035, 0.7, 2, 6).translate(0, -0.4, 0), coat);
   part(tail, new THREE.SphereGeometry(0.08, 6, 5).scale(1, 1.6, 1), 0x2b2420, 0, -0.82, 0);
+  sealRig(root);
   return {
     root,
     pose(p) {
