@@ -66,8 +66,13 @@ void main(){
   vec3 lit = base*(uAmb*.3+uLightCol*.78);
   float ex = 1.-.34*uNight; mid *= ex; lit *= ex; shade *= 1.-.2*uNight;
   vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
+  float edge1 = smoothstep(-.06,.0,nl) - smoothstep(.0,.06,nl);
+  col += uShadow*.35*edge1*base;
+  float wl = smoothstep(-.2,1.1,vW.y);
+  col *= mix(.72, 1., wl);
+  col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
   float rim = pow(1.-max(dot(n,v),0.),3.);
-  col += uRim*smoothstep(.5,.58,rim)*(.25+.75*hemi)*.55;
+  col += uRim*smoothstep(.46,.52,rim)*(.3+.7*hemi)*mix(.38,.75,uNight);
   vec3 h = normalize(uLightDir+v);
   col += uLightCol*step(.55,pow(max(dot(n,h),0.),70.))*uSpec;
   col += uEmisCol*uEmis*(1.+uEmisN*uNight);
@@ -132,7 +137,7 @@ export function outline(px = 2.2): THREE.ShaderMaterial {
     fragmentShader: /* glsl */ `
       ${COMMON}
       uniform vec3 uInk; varying vec3 vW;
-      void main(){ gl_FragColor = vec4(applyFog(uInk, length(cameraPosition-vW)), 1.); }`,
+      void main(){ vec3 ink = mix(uInk*vec3(1.5,1.2,1.0)+vec3(.05,.03,.02), uInk*vec3(.9,1.1,1.8), uNight); gl_FragColor = vec4(applyFog(ink, length(cameraPosition-vW)), 1.); }`,
     side: THREE.BackSide,
   });
 }
