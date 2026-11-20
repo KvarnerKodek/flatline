@@ -40,6 +40,14 @@ export function makeSky(): THREE.Group {
             float st = step(.9965,h) * smoothstep(.34,.0,length(f));
             float tw = .6+.4*sin(uTime*(1.5+h*3.)+h*40.);
             col += vec3(.85,.92,1.)*st*tw*uStars*smoothstep(.02,.25,d.y);
+            vec3 sp2 = d*90.; vec3 id2 = floor(sp2); vec3 f2 = fract(sp2)-.5;
+            float h2 = hash21(id2.xy*1.7+id2.z*3.1);
+            float r2 = length(f2);
+            float big = step(.972,h2) * (smoothstep(.3,.0,r2) + .35*smoothstep(.5,.0,r2));
+            vec3 tint = mix(vec3(.75,.85,1.), vec3(1.,.9,.75), fract(h2*91.));
+            col += tint*big*(.65+.35*sin(uTime*(1.+h2*2.)+h2*60.))*uStars*smoothstep(.03,.3,d.y);
+            float mw = exp(-pow(dot(d, normalize(vec3(.35,.75,-.55))),2.)*14.) * smoothstep(.28,.62,fbm(d.xz*14./(d.y+.4)+5.));
+            col += vec3(.18,.24,.42)*mw*.5*uStars*smoothstep(.05,.4,d.y);
           }
           // moon
           float md = acos(clamp(dot(d, ld),-1.,1.));
