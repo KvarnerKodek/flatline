@@ -33,3 +33,35 @@ describe('score', () => {
     expect(v.getUint32(40, true)).toBe(l.length * 4);
   });
 });
+
+describe('score worker', () => {
+  it('renders in an isolated worker the same samples as in place, so its source needs nothing from outside', async () => {
+    const mod = 'node:vm', vm = (await import(/* @vite-ignore */ mod)) as { createContext(o: object): object; runInContext(src: string, ctx: object): void };
+    const { renderScoreAsync } = await import('../src/score');
+    const blobs = new Map<string, Blob>();
+    const g = globalThis as unknown as Record<string, unknown>;
+    const saved = { Worker: g.Worker, create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    URL.createObjectURL = (b: Blob) => { const id = `blob:${blobs.size}`; blobs.set(id, b as Blob); return id; };
+    URL.revokeObjectURL = () => {};
+    let isolated = false;
+    g.Worker = class {
+      onmessage?: (e: { data: unknown }) => void;
+      constructor(private url: string) {}
+      async postMessage(data: unknown) {
+        const src = await blobs.get(this.url)!.text();
+        const ctx = vm.createContext({ Float32Array, Math, Array, postMessage: (r: unknown) => this.onmessage?.({ data: r }) }) as { onmessage?: (e: { data: unknown }) => void };
+        vm.runInContext(src, ctx);
+        isolated = true;
+        ctx.onmessage!({ data });
+      }
+      terminate() {}
+    };
+    try {
+      const [l] = await renderScoreAsync(score, 8000);
+      expect(isolated).toBe(true);
+      expect(Array.from(l)).toEqual(Array.from(renderScore(score, 8000)[0]));
+    } finally {
+      g.Worker = saved.Worker; URL.createObjectURL = saved.create; URL.revokeObjectURL = saved.revoke;
+    }
+  });
+});

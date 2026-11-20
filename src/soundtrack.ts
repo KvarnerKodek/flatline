@@ -27,9 +27,9 @@ export class Soundtrack implements Sound {
 
   constructor(private score: Score, private rate = 32000) {}
 
-  /** Starts rendering in the background, in small slices, so sound is ready by the time the viewer asks for it. */
+  /** Starts rendering in a background worker, so sound is ready by the time the viewer asks for it and playback never stutters. */
   prepare() {
-    this.samples ??= renderScoreAsync(this.score, this.rate, 4);
+    this.samples ??= renderScoreAsync(this.score, this.rate);
   }
 
   /** Turns sound on or off; the first time, the score renders in the background and `ready` runs when it can be heard. */
