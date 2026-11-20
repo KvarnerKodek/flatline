@@ -27,3 +27,5 @@ export * from './softclouds';
 export * from './instanced';
 export * from './fx';
 export * from './meadow';
+export * from './score';
+export * from './soundtrack';

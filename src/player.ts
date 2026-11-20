@@ -5,6 +5,7 @@ import { Hud } from './hud';
 import type { HudOptions } from './hud';
 import { applyLook } from './look';
 import type { Film } from './timeline';
+import { Soundtrack } from './soundtrack';
 import './flatline.css';
 
 THREE.ColorManagement.enabled = false;
@@ -33,7 +34,7 @@ export function applyTheme(theme?: Theme) {
   for (const [k, v] of Object.entries(theme.vars ?? {})) document.documentElement.style.setProperty(k, v);
 }
 
-export interface Player { seek(t: number): void; readonly duration: number }
+export interface Player { seek(t: number): void; readonly duration: number; wav?(): string }
 
 declare global {
   interface Window { __flatline?: Player }
@@ -95,6 +96,12 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   let playing = !reduced && !q.has('still') && !embed;
   const toggle = () => { if (t >= film.duration) t = 0; playing = !playing; hud.setPlaying(playing); };
   const hud = new Hud(film.captions, film.chapters, film.duration, toggle, (s) => { t = s; }, brand, opts.hud);
+  const sound = film.score ? new Soundtrack(film.score()) : undefined;
+  if (sound && !render3d) setTimeout(() => sound.prepare(), 1500);
+  if (sound && !render3d) hud.button('Sound off', (b) => {
+    b.textContent = sound.on ? 'Sound off' : 'Tuning';
+    sound.enable(!sound.on, () => { b.textContent = 'Sound on'; });
+  });
   hud.setPlaying(playing);
   const say = (type: string) => { if (embed) parent.postMessage({ source: 'flatline', type }, location.origin); };
   let card: HTMLElement | undefined, announced = false;
@@ -144,7 +151,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
     film.afterPost?.(world, t, { renderer, camera, width: W, height: Hh, hud });
   };
 
-  const player: Player = { seek: (s) => { t = s; render(performance.now()); }, duration: film.duration };
+  const player: Player = { seek: (s) => { t = s; render(performance.now()); }, duration: film.duration, wav: sound && (() => sound.wavBase64()) };
   window.__flatline = player;
   render(performance.now());
   document.getElementById('boot')?.remove();
@@ -164,7 +171,10 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
       adapt(dt);
       if (playing && !document.hidden) {
         t += dt;
+        if (sound) t = sound.sync(t, playing);
         if (t >= film.duration) { t = film.duration; playing = false; hud.setPlaying(false); }
+      } else if (sound) {
+        sound.sync(t, false);
       }
       render(now);
       requestAnimationFrame(loop);

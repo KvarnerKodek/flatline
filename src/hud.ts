@@ -92,6 +92,14 @@ export class Hud {
 
   setPlaying(p: boolean) { this.playBtn.textContent = p ? 'Pause' : 'Play'; this.playBtn.classList.toggle('playing', p); this.playBtn.setAttribute('aria-label', p ? 'Pause' : 'Play'); }
 
+  /** Adds a button to the control bar, after Play. */
+  button(label: string, onClick: (b: HTMLElement) => void): HTMLElement {
+    const b = el('button', '', label);
+    b.addEventListener('click', () => onClick(b));
+    this.playBtn.after(b);
+    return b;
+  }
+
   update(t: number, tracks: TrackSpec[], cam: THREE.PerspectiveCamera, w: number, h: number) {
     for (const { c, e } of this.caps) {
       const a = Math.min(1, Math.max(0, Math.min((t - c.t0) / 0.9, (c.t1 - t) / 0.9)));

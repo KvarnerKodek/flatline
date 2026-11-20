@@ -39,7 +39,7 @@ Space plays and pauses, arrows skip five seconds, `R` restarts.
 npx flatline-render --url http://127.0.0.1:5180/ --out film.mp4 --size 1280x720 --fps 30
 ```
 
-Needs Chrome and ffmpeg. It uses the GPU (Metal on a Mac); `--software` forces SwiftShader. The output
+Needs Chrome and ffmpeg. A film with a `score` gets its music muxed in as AAC. It uses the GPU (Metal on a Mac); `--software` forces SwiftShader. The output
 has no controls, no watermark and no metadata.
 
 ## What is in the box
@@ -59,6 +59,7 @@ has no controls, no watermark and no metadata.
 | `shots` | Shot lists: each shot owns the film until the next, with cuts, fades, dolly, orbit, hand-held drift and a list check |
 | `land`, `track` | Height-field land with painted shore or alpine palettes, plateaus, draped roads and fields; routes measured in metres, graded beds, railways, trains, glowing route lines |
 | `town`, `figure` | Houses and chalets with lightable windows, church, market stall, fence, flowers, groves; articulated people, a cat and a cow |
+| `score`, `soundtrack` | A film score as notes, synthesised deterministically (piano, bells, pads, strings, bass, reverb) and played in sync with film time; the renderer muxes the same audio |
 | `motes`, `shadow` | Time-placed glows, coins and inked puffs, rain, arcs; sun shadows for every toon surface |
 | `look` | `Look` presets (`CEL`, the original crisp toon, and `GHIBLI`, hand-painted) and `applyLook` |
 | `edges` | Screen-space ink lines from depth, FXAA, distance haze and ground fog, driven by `Look.edges` and `Look.haze` |

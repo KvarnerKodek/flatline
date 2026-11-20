@@ -3,6 +3,7 @@ import type { Caption, Chapter, TrackSpec } from './hud';
 import type { SunShadow } from './shadow';
 import type { Grade } from './post';
 import type { Look } from './look';
+import type { Score } from './score';
 
 export type { Caption, Chapter, TrackSpec };
 
@@ -60,6 +61,8 @@ export interface Film<W> {
   frame(world: W, t: number): Frame;
   /** Maps playback time to film time (see `timeWarp`); the HUD and captions stay on playback time. */
   warp?(t: number): number;
+  /** The film's music, written as notes; the player plays it in sync and the renderer muxes it into the video. */
+  score?(): Score;
   /** Sun shadows to draw before each frame; aim them from `frame`. */
   sun?(world: W): SunShadow;
   /** How the film is drawn: shading, linework, painterly texture, haze and grade. `GHIBLI` or `CEL`, or your own. */

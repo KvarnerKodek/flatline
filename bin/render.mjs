@@ -2,6 +2,9 @@
 // Renders a flatline film to an MP4, frame-exact, by seeking the page and capturing each frame.
 //   flatline-render --url http://127.0.0.1:5180/ --out film.mp4 [--size 1280x720] [--fps 30] [--from 0] [--to 100] [--crf 17]
 import { spawn } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import puppeteer from 'puppeteer-core';
 
@@ -26,7 +29,11 @@ await page.goto(`${a.url}${sep}still&render&t=${from}`, { waitUntil: 'domcontent
 await page.waitForFunction(() => document.title === 'ready' && window.__flatline, { timeout: 120000 });
 const to = a.to ? Number(a.to) : await page.evaluate(() => window.__flatline.duration);
 const n = Math.round((to - from) * fps);
-const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', a.crf, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-map_metadata', '-1', a.out], { stdio: ['pipe', 'inherit', 'inherit'] });
+const b64 = await page.evaluate(() => window.__flatline.wav?.());
+const audio = b64 ? join(mkdtempSync(join(tmpdir(), 'flatline-audio-')), 'score.wav') : undefined;
+if (audio) writeFileSync(audio, Buffer.from(b64, 'base64'));
+const sound = audio ? ['-ss', String(from), '-t', String(to - from), '-i', audio] : [], soundOut = audio ? ['-c:a', 'aac', '-b:a', '192k', '-shortest'] : [];
+const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-', ...sound, ...soundOut, '-c:v', 'libx264', '-preset', 'medium', '-crf', a.crf, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-map_metadata', '-1', a.out], { stdio: ['pipe', 'inherit', 'inherit'] });
 const start = Date.now();
 for (let i = 0; i < n; i++) {
   await page.evaluate((t) => window.__flatline.seek(t), from + i / fps);
