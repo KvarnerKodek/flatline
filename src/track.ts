@@ -244,12 +244,26 @@ export function wagon(body = 0x8a5a3a, load?: number, wheels = false): RollingSt
     p.push(box(0.14, 1.05, 2.1, s * 2.63, 1.65, 0, body));
     for (const x of [-1.6, 1.6]) p.push(wheel(0.5, x, s * 0.86));
     for (const x of [-1.8, 0, 1.8]) p.push(box(0.14, 1.15, 0.18, x, 1.65, s * 1.04, 0x5a3a26));
+    // Plank seams and iron strapping, so the sides read as built from boards.
+    const seam = new THREE.Color(body).multiplyScalar(0.72).getHex(), strap = 0x2b2f36;
+    for (const y of [1.38, 1.65, 1.92]) p.push(box(5.38, 0.035, 0.02, 0, y, s * 1.055, seam));
+    for (const x of [-2.5, 2.5]) p.push(box(0.12, 1.1, 0.04, x, 1.65, s * 1.07, strap));
+    p.push(box(5.4, 0.09, 0.05, 0, 2.15, s * 1.07, strap));
   }
   if (load !== undefined) {
     p.push(box(5.0, 0.6, 1.8, 0, 1.75, 0, 0x6b4a35));
     let seed = 7;
     const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    if (wheels) for (let i = 0; i < 10; i++) for (let k = 0; k < 2 + (i % 2); k++) p.push(paint(new THREE.CylinderGeometry(0.42, 0.42, 0.2, 14).translate(-2.1 + (i % 5) * 1.05, 2.16 + k * 0.21, i < 5 ? -0.46 : 0.46), load));
+    if (wheels) {
+      // Cheese wheels: a darker rind round the edge, a pale cut-coloured top, bulging a little at the middle.
+      const rind = new THREE.Color(load).multiplyScalar(0.78).getHex(), top = new THREE.Color(load).lerp(new THREE.Color(0xfff4d0), 0.35).getHex();
+      for (let i = 0; i < 10; i++) for (let k = 0; k < 2 + (i % 2); k++) {
+        const x = -2.1 + (i % 5) * 1.05, y = 2.16 + k * 0.21, z = i < 5 ? -0.46 : 0.46;
+        p.push(paint(new THREE.CylinderGeometry(0.4, 0.4, 0.19, 16).scale(1, 1, 1).translate(x, y, z), rind));
+        p.push(paint(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 16).translate(x, y, z), load));
+        p.push(paint(new THREE.CylinderGeometry(0.37, 0.37, 0.012, 16).translate(x, y + 0.1, z), top));
+      }
+    }
     else for (let i = 0; i < 46; i++) p.push(paint(new THREE.IcosahedronGeometry(0.26, 0).translate((r() - 0.5) * 4.7, 2.12 + r() * 0.34, (r() - 0.5) * 1.6), load));
   }
   return { root: car(p), length: 6.2 };
