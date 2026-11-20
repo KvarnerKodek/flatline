@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { bezier, checkScript, clamp, ease, outBack, pulse, ramp, shiftCamera, smoother, ss, V } from '../src/timeline';
+import { bezier, checkScript, clamp, cutEase, ease, outBack, pulse, ramp, shiftCamera, smoother, ss, V } from '../src/timeline';
 import { DAWN, DAY, NIGHT, mixMood, moodTrack } from '../src/mood';
 import { Placed, place } from '../src/bob';
 import { waveHeight } from '../src/water';
@@ -46,6 +46,18 @@ describe('moods', () => {
     expect(NIGHT.fogD).toBe(n0);
     expect(DAWN.lightDir.equals(d0)).toBe(true);
     expect(m.lightDir.length()).toBeCloseTo(1, 6);
+  });
+});
+
+describe('cut ease', () => {
+  it('runs 0 to 1, rises monotonically and still moves at the end', () => {
+    expect(cutEase(0)).toBe(0);
+    expect(cutEase(1)).toBe(1);
+    expect(cutEase(-1)).toBe(0);
+    expect(cutEase(2)).toBe(1);
+    let prev = -1;
+    for (let i = 0; i <= 50; i++) { const e = cutEase(i / 50); expect(e).toBeGreaterThanOrEqual(prev); prev = e; }
+    expect(cutEase(1) - cutEase(0.98)).toBeGreaterThan(0.005);
   });
 });
 
