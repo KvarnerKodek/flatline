@@ -53,6 +53,10 @@ export interface Film<W> {
   /** Objects re-centred on the camera every frame, such as the sky dome and the sea. */
   follow?(world: W): THREE.Object3D[];
   frame(world: W, t: number): Frame;
+  /** Maps playback time to film time (see `timeWarp`); the HUD and captions stay on playback time. */
+  warp?(t: number): number;
+  /** Playback time at which the film proper ends and the end card is fully shown. */
+  endCard?: { html: string; at: number };
   /** Optional extra drawing straight onto the canvas after post-processing, for inset views. */
   afterPost?(world: W, t: number, ctx: AfterPost): void;
 }

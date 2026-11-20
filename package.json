@@ -12,7 +12,8 @@
     "./*": "./src/*.ts"
   },
   "bin": {
-    "flatline-render": "bin/render.mjs"
+    "flatline-render": "bin/render.mjs",
+    "flatline-check": "bin/check.mjs"
   },
   "files": [
     "src",

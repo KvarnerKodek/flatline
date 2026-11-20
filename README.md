@@ -45,15 +45,25 @@ has no controls, no watermark and no metadata.
 
 | Module | Purpose |
 |---|---|
-| `toon` | Shared uniforms, cel-shaded material, inverted-hull outline, glow sprites |
-| `mood`, `sky`, `water` | Day to night palettes, painted sky and ridges, banded sea with wakes |
+| `toon` | Shared uniforms, painted cel shading (three bands, shadow-edge accent, waterline occlusion, tinted ink outline, day/night rim), glow sprites |
+| `mood`, `sky`, `water` | Day to night palettes, painted sky and ridges, banded sea with wakes and calm glint |
+| `clouds`, `birds` | Painted cumulus and a circling gull flock, both pure functions of time |
 | `bob` | Float objects on the same swell the water draws |
 | `post` | Bloom, grade, grain, fade |
-| `hud` | Captions, chapters, scrubber, lock-on brackets and tags |
+| `hud` | Captions, chapters, scrubber, lock-on brackets and tags that stay on screen and avoid each other |
 | `thermal` | White-hot inset view of tagged objects |
-| `occupancy`, `swarm` | A sensor grid overlay and a mesh network overlay |
-| `props` | Low-poly mesher and sea props (boats, buoy, lighthouse) |
-| `timeline`, `player` | Film contract, easing, script checks, the page player |
+| `occupancy`, `swarm`, `wind` | Sensor grid, mesh network and wind streak overlays |
+| `props` | Smooth hull lofting, detailed sailboat, fishing boat, motorboat and ferry, waterline foam, buoy, lighthouse |
+| `timeline`, `player` | Film contract, easing, trapezoid ramps, time warp, script checks, the page player with end card and embed protocol |
+
+## Audit a film before shipping
+
+```sh
+npx flatline-check --url http://127.0.0.1:5180/
+```
+
+Checks that the picture does not depend on seek order and lists the biggest frame-to-frame jumps, which is how an
+unplanned hard cut or pop is found. Run it after every scene change.
 
 ## Rules the code keeps
 
@@ -61,6 +71,9 @@ has no controls, no watermark and no metadata.
   source is the colour on screen.
 - Nothing in a frame depends on wall-clock time. If it does, video rendering will not match the page.
 - `checkScript(film)` fails on overlapping or too-short captions, dash characters and bad chapters.
+- Hulls point their bow along +x; a test builds each craft and checks it.
+- Fades and cuts are a pure, unit-tested function of time, never inline arithmetic spread over the render loop.
+- A closing card that hands back to a host page should reuse the host's layout pixel for pixel so the cross-fade has no jump.
 
 ## Develop
 
