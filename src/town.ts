@@ -367,6 +367,40 @@ export function church(wall = 0xf7f1e3, roof = 0x8a4a3a, dome = 0x4f7a6a): THREE
   for (const y of [8, 13]) m.box(5.74, y, 0, 0.12, 1.8, 0.9, hex(0x27384d));
   m.box(5.76, 15.6, 0, 0.1, 1.5, 1.5, hex(0xfff6e0));
   for (const s of [-1, 1]) for (const x of [-12, -8.5, -5, -1.5]) m.box(x, 4.4, s * 4.03, 1.0, 2.6, 0.1, hex(0x27384d));
+  // Baroque detail: painted corner pilasters and cornice bands, arched window heads, belfry louvres on every face,
+  // a clock with gilded hands, a plinth, and shingle courses on the nave roof.
+  const ochre = hex(0xe8c98e), stone = hex(0xb9ad9c), gold = hex(0xe2b45a), dark = hex(0x3a2a22);
+  m.box(-7, 0.3, 0, 16.3, 0.6, 8.3, stone);
+  m.box(3.2, 0.35, 0, 5.3, 0.7, 5.3, stone);
+  for (const y of [7.9, 12.0, 17.8]) m.box(3.2, y, 0, 5.36, 0.3, 5.36, ochre);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    m.box(3.2 + sx * 2.45, 9, sz * 2.45, 0.35, 18, 0.35, ochre);
+    m.box(-7 + sx * 7.85, 4, sz * 3.85, 0.4, 8, 0.4, ochre);
+  }
+  for (const s of [-1, 1]) for (const x of [-12, -8.5, -5, -1.5]) {
+    m.box(x, 5.95, s * 4.06, 1.3, 0.35, 0.12, ochre);
+    m.box(x, 3.0, s * 4.06, 1.3, 0.16, 0.14, ochre);
+  }
+  for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const box = (along: number, y: number, out: number, la: number, ly: number, ld: number, c: THREE.Vector3) =>
+      nx ? m.box(3.2 + nx * (2.5 + out), y, along, ld, ly, la, c) : m.box(3.2 + along, y, nz * (2.5 + out), la, ly, ld, c);
+    box(0, 14.9, 0.02, 1.7, 3.0, 0.1, dark);
+    for (let k = 0; k < 6; k++) box(0, 13.8 + k * 0.42, 0.1, 1.6, 0.12, 0.08, ochre.clone().multiplyScalar(0.85));
+    box(0, 16.55, 0.06, 1.95, 0.3, 0.14, ochre);
+    if (nx === 1) {
+      box(0, 10.0, 0.04, 2.0, 2.0, 0.08, hex(0xfff6e0));
+      box(0, 10.0, 0.08, 2.2, 0.12, 0.06, gold);
+      box(0, 10.0, 0.08, 0.12, 2.2, 0.06, gold);
+      box(0.28, 10.25, 0.12, 0.1, 0.7, 0.06, dark);
+      box(0, 10.4, 0.14, 0.1, 0.9, 0.06, dark);
+    }
+  }
+  const Rn = R.clone();
+  for (const s of [-1, 1]) for (let i = 1; i < 9; i++) {
+    const t = i / 9, y = 7.8 + 4.6 * t + 0.03, z = s * 4.5 * (1 - t);
+    m.c = new THREE.Vector3(-7, 8, 0);
+    m.box(-7.1, y, z, 16.6, 0.07, 0.12, Rn.clone().multiplyScalar(0.82));
+  }
   const root = finish(m);
   const D = hex(dome), prof: [number, number][] = [[2.9, 18], [3.3, 19.2], [3.0, 20.6], [1.6, 22.2], [0.75, 23.4], [0.55, 24.6], [1.2, 25.6], [1.25, 26.4], [0.5, 27.6], [0.08, 30.2]];
   const pts = prof.map(([r, y]) => new THREE.Vector2(r, y));
