@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { toon, outline, glow, hex } from './toon';
 
 const MAT = toon({ vertexColors: true, spec: 0.1 });
@@ -389,4 +390,19 @@ export function freeze(root: THREE.Object3D, moving: THREE.Object3D[] = []) {
     if (keep.has(child)) continue;
     child.traverse((o) => { o.matrixAutoUpdate = false; o.matrixWorldAutoUpdate = false; });
   }
+}
+
+export interface Phone { root: THREE.Group; screen: THREE.Mesh }
+
+/**
+ * A smartphone about 15 cm tall, screen facing +z, centred on the origin. `screen` is drawn unlit so an app reads
+ * clearly in any light; swap its texture to change what the phone shows.
+ */
+export function phone(screen?: THREE.Texture, body = 0x1b1410): Phone {
+  const root = new THREE.Group();
+  const shell = new THREE.Mesh(new RoundedBoxGeometry(0.076, 0.156, 0.009, 3, 0.011), toon({ color: body, spec: 0.6 }));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.068, 0.146), new THREE.MeshBasicMaterial({ map: screen ?? null, color: screen ? 0xffffff : 0x10141c }));
+  glass.position.z = 0.0047;
+  root.add(shell, glass);
+  return { root, screen: glass };
 }
