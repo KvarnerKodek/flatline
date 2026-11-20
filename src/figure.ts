@@ -22,7 +22,15 @@ function shadow(parent: THREE.Object3D, rx: number, rz: number) {
   parent.add(s);
 }
 
-export interface FigureOpts { skin?: number; coat?: number; legs?: number; hair?: number; hat?: number; scarf?: number; dress?: boolean; apron?: number; build?: number }
+/**
+ * `outfit` dresses the figure in alpine costume: a `dirndl` (bodice in `coat`, white blouse, full skirt in `skirt`, apron) or
+ * `lederhosen` (white shirt, braces, leather shorts, knee socks). `tyrolean` turns the hat into a felt hat with band and
+ * feather. `hairStyle` adds `braids` or a `bun` behind the head.
+ */
+export interface FigureOpts {
+  skin?: number; coat?: number; legs?: number; hair?: number; hat?: number; scarf?: number; dress?: boolean; apron?: number; build?: number;
+  outfit?: 'dirndl' | 'lederhosen'; skirt?: number; tyrolean?: boolean; hairStyle?: 'braids' | 'bun';
+}
 /** `mood` runs from -1, a worried frown with raised inner brows, to 1, a smile. */
 export interface FigurePose { walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number; mood?: number }
 
@@ -36,13 +44,17 @@ export function figure(o: FigureOpts = {}): Figure {
   const root = new THREE.Group(), body = new THREE.Group();
   root.add(body);
   shadow(root, 0.42, 0.34);
-  const skin = o.skin ?? 0xf0c8a0, coat = o.coat ?? 0x3d6f9e, legC = o.legs ?? 0x3a3f4a, b = o.build ?? 1;
+  const skin = o.skin ?? 0xf0c8a0, coat = o.coat ?? 0x3d6f9e, b = o.build ?? 1;
+  const dirndl = o.outfit === 'dirndl', leder = o.outfit === 'lederhosen', dress = o.dress || dirndl;
+  const legC = leder ? 0xf4efe4 : o.legs ?? 0x3a3f4a, leather = 0x6b4a2e, shirt = 0xfbf6ec;
   const hips = 0.82;
   const leg = (s: number) => {
     const g = new THREE.Group();
     g.position.set(0, hips, s * 0.11);
     part(g, new THREE.CapsuleGeometry(0.085, 0.58, 3, 8).translate(0, -0.4, 0), legC);
-    part(g, new THREE.SphereGeometry(0.1, 8, 6).scale(1.5, 0.7, 1).translate(0.05, -0.78, 0), 0x4a3526);
+    if (leder) part(g, new THREE.CylinderGeometry(0.105, 0.11, 0.3, 10).translate(0, -0.12, 0), o.legs ?? leather);
+    part(g, new THREE.CapsuleGeometry(0.075, 0.08, 3, 8).rotateZ(Math.PI / 2).scale(1, 0.85, 1).translate(0.05, -0.76, 0), 0x3a2618);
+    part(g, new THREE.CylinderGeometry(0.083, 0.088, 0.12, 10).translate(0, -0.69, 0), 0x3a2618);
     body.add(g);
     return g;
   };
@@ -50,12 +62,22 @@ export function figure(o: FigureOpts = {}): Figure {
   const torso = new THREE.Group();
   torso.position.y = hips;
   body.add(torso);
-  part(torso, new THREE.CylinderGeometry(0.19 * b, (o.dress ? 0.4 : 0.26) * b, o.dress ? 0.98 : 0.66, 12).translate(0, o.dress ? 0.17 : 0.33, 0), coat);
+  if (dirndl) {
+    part(torso, new THREE.CylinderGeometry(0.2 * b, 0.44 * b, 0.62, 16).translate(0, -0.06, 0), o.skirt ?? 0x8a3b4a);
+    part(torso, new THREE.CylinderGeometry(0.18 * b, 0.21 * b, 0.42, 14).translate(0, 0.45, 0), coat);
+    part(torso, new THREE.CylinderGeometry(0.155 * b, 0.18 * b, 0.12, 14).translate(0, 0.66, 0), shirt);
+  } else if (leder) {
+    part(torso, new THREE.CylinderGeometry(0.19 * b, 0.23 * b, 0.66, 12).translate(0, 0.33, 0), o.coat ?? shirt);
+    part(torso, new THREE.CylinderGeometry(0.235 * b, 0.235 * b, 0.12, 12).translate(0, 0.04, 0), o.legs ?? leather);
+    for (const s of [-1, 1]) part(torso, new THREE.BoxGeometry(0.03, 0.62, 0.045).translate(0.2 * b, 0.36, s * 0.085), o.legs ?? leather);
+    part(torso, new THREE.BoxGeometry(0.03, 0.05, 0.2).translate(0.205 * b, 0.48, 0), o.legs ?? leather);
+  } else part(torso, new THREE.CylinderGeometry(0.19 * b, (dress ? 0.4 : 0.26) * b, dress ? 0.98 : 0.66, 12).translate(0, dress ? 0.17 : 0.33, 0), coat);
   if (o.apron !== undefined) part(torso, new THREE.CylinderGeometry(0.218 * b, 0.285 * b, 0.6, 10, 1, false, Math.PI / 2 - 0.85, 1.7).translate(0, 0.3, 0), o.apron);
   const arm = (s: number) => {
     const g = new THREE.Group();
     g.position.set(0, 0.6, s * 0.25 * b);
-    part(g, new THREE.CapsuleGeometry(0.065, 0.44, 3, 8).translate(0, -0.27, 0), coat);
+    part(g, new THREE.CapsuleGeometry(0.065, 0.44, 3, 8).translate(0, -0.27, 0), dirndl || leder ? shirt : coat);
+    if (dirndl) part(g, new THREE.SphereGeometry(0.1, 10, 8).scale(1, 0.9, 1).translate(0, -0.05, 0), shirt);
     const hand = part(g, new THREE.SphereGeometry(0.075, 8, 6), skin, 0, -0.56, 0);
     torso.add(g);
     return { g, hand };
@@ -66,7 +88,14 @@ export function figure(o: FigureOpts = {}): Figure {
   head.position.y = 0.92;
   torso.add(head);
   part(head, new THREE.SphereGeometry(0.23, 14, 10), skin);
-  part(head, new THREE.SphereGeometry(0.245, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55).rotateZ(0.5), o.hair ?? 0x3b2a20, -0.012, 0.012, 0);
+  const hair = o.hair ?? 0x3b2a20;
+  part(head, new THREE.SphereGeometry(0.245, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55).rotateZ(0.5), hair, -0.012, 0.012, 0);
+  for (const s of [-1, 1]) part(head, new THREE.SphereGeometry(0.045, 8, 6).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.225);
+  if (o.hairStyle === 'bun') part(head, new THREE.SphereGeometry(0.1, 10, 8), hair, -0.2, 0.12, 0);
+  if (o.hairStyle === 'braids') for (const s of [-1, 1]) {
+    for (let k = 0; k < 4; k++) part(head, new THREE.SphereGeometry(0.052 - k * 0.006, 8, 6), hair, -0.12 - k * 0.012, -0.12 - k * 0.085, s * 0.17);
+    part(head, new THREE.SphereGeometry(0.03, 6, 5), o.scarf ?? 0xc8553d, -0.17, -0.47, s * 0.17);
+  }
   const brows: THREE.Mesh[] = [];
   const face = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); head.add(m); return m; };
   for (const s of [-1, 1]) {
@@ -77,7 +106,12 @@ export function figure(o: FigureOpts = {}): Figure {
   }
   part(head, new THREE.SphereGeometry(0.03, 8, 6).scale(1.2, 0.9, 0.9), skin, 0.232, -0.028, 0);
   const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 10, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.216, -0.095, 0);
-  if (o.hat !== undefined) {
+  if (o.hat !== undefined && o.tyrolean) {
+    part(head, new THREE.CylinderGeometry(0.33, 0.34, 0.03, 18).rotateZ(-0.06), o.hat, 0, 0.17, 0);
+    part(head, new THREE.CylinderGeometry(0.15, 0.2, 0.22, 14).scale(1.12, 1, 0.92), o.hat, 0, 0.29, 0);
+    part(head, new THREE.CylinderGeometry(0.2, 0.205, 0.045, 14).scale(1.12, 1, 0.92), 0x3a2618, 0, 0.2, 0);
+    part(head, new THREE.ConeGeometry(0.035, 0.24, 6).scale(1, 1, 0.45).rotateZ(1.05).translate(-0.17, 0.33, 0.19), 0xf2e6c8);
+  } else if (o.hat !== undefined) {
     part(head, new THREE.CylinderGeometry(0.44, 0.46, 0.035, 18), o.hat, 0, 0.15, 0);
     part(head, new THREE.CylinderGeometry(0.17, 0.21, 0.17, 14), o.hat, 0, 0.24, 0);
   }
