@@ -13,3 +13,4 @@ export * from './timeline';
 export * from './player';
 export * from './wind';
 export * from './clouds';
+export * from './birds';
