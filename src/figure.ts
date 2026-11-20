@@ -40,7 +40,9 @@ export interface FigureOpts {
  * - `armL`/`armR` swing an arm forward and up about the shoulder (1.57 is level, 2.6 is overhead), `reachL`/`reachR`
  *   bring it across the body; `elbowL`/`elbowR` bend the elbow (defaults to a natural bend that grows as the arm lifts).
  * - `gripL`/`gripR` put that hand's palm on a world point, solving shoulder and elbow (two-bone IK); this wins over
- *   `arm`/`reach`/`elbow`. `curlL`/`curlR` close the fingers, 0 open to 1 a fist (a grip curls them by default).
+ *   `arm`/`reach`/`elbow`. `gripMixL`/`gripMixR` ease between the two: 0 keeps the arm's own pose, 1 (the default)
+ *   puts the palm on the grip, so a hand can travel to a prop and leave it again without a snap. `curlL`/`curlR`
+ *   close the fingers, 0 open to 1 a fist (a grip curls them by default).
  * - `bow` leans the upper body forward, `headYaw`/`headPitch` turn the head, `mood` runs from -1, a worried frown
  *   with raised inner brows, to 1, a smile.
  * - `t` is film time for idle life (breathing, weight shift, head drift, blinks, glances); it defaults to the
@@ -49,7 +51,7 @@ export interface FigureOpts {
  */
 export interface FigurePose {
   walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number; mood?: number;
-  elbowL?: number; elbowR?: number; gripL?: THREE.Vector3 | null; gripR?: THREE.Vector3 | null; curlL?: number; curlR?: number; t?: number; idle?: number;
+  elbowL?: number; elbowR?: number; gripL?: THREE.Vector3 | null; gripR?: THREE.Vector3 | null; gripMixL?: number; gripMixR?: number; curlL?: number; curlR?: number; t?: number; idle?: number;
 }
 
 /** `hand` is the right palm (kept for older films); `handL`/`handR` are the palms, where props are attached. */
@@ -131,6 +133,7 @@ export function figure(o: FigureOpts = {}): Figure {
     return { hip, knee, ankle, s, sole };
   };
   const legs = [leg(-1), leg(1)];
+  if (!dress) part(pelvis, new THREE.CapsuleGeometry(0.115 * b, 0.12, 4, 14).rotateX(Math.PI / 2).scale(0.95, 1.1, 1).translate(0, -0.035, 0), leder ? leather : legC);
 
   if (dirndl || dress) {
     const len = dirndl ? 0.6 : 0.95, hem = (dirndl ? 0.44 : 0.4) * b;
@@ -156,13 +159,13 @@ export function figure(o: FigureOpts = {}): Figure {
     part(spine, new THREE.BoxGeometry(0.03, 0.05, 0.2).translate(0.205 * b, 0.48, 0), leather);
   } else if (!dress) part(spine, new THREE.CylinderGeometry(0.19 * b, 0.26 * b, 0.68, 14).translate(0, 0.32, 0), coat);
   else part(spine, new THREE.CylinderGeometry(0.19 * b, 0.22 * b, 0.4, 14).translate(0, 0.46, 0), coat);
-  if (o.apron !== undefined && !dirndl && !dress) part(spine, garment([[0.22 * b, 0.6], [0.24 * b, 0.4], [0.29 * b, 0.0]], 4, 0.008, -0.85, 1.7), o.apron);
+  if (o.apron !== undefined && !dirndl && !dress) part(spine, garment([[0.22 * b, 0.6], [0.24 * b, 0.4], [0.29 * b, 0.0]], 4, 0.008, Math.PI / 2 - 0.85, 1.7), o.apron);
   if (o.scarf !== undefined) part(spine, new THREE.TorusGeometry(0.15, 0.065, 8, 16).rotateX(Math.PI / 2), o.scarf, 0, 0.68, 0);
 
-  type Arm = { sh: THREE.Group; el: THREE.Group; wr: THREE.Group; fingers: THREE.Group; thumb: THREE.Group; palm: THREE.Object3D; s: number };
+  type Arm = { sh: THREE.Group; el: THREE.Group; wr: THREE.Group; fingers: THREE.Group; tip: THREE.Group; thumb: THREE.Group; palm: THREE.Object3D; s: number };
   const sleeve = dirndl || leder ? shirt : coat;
   const arm = (s: number): Arm => {
-    const sh = new THREE.Group(), el = new THREE.Group(), wr = new THREE.Group(), fingers = new THREE.Group(), thumb = new THREE.Group(), palm = new THREE.Object3D();
+    const sh = new THREE.Group(), el = new THREE.Group(), wr = new THREE.Group(), fingers = new THREE.Group(), tip = new THREE.Group(), thumb = new THREE.Group(), palm = new THREE.Object3D();
     sh.position.set(0, 0.6, s * 0.25 * b);
     el.position.y = -ARM_U;
     wr.position.y = -ARM_F;
@@ -172,17 +175,20 @@ export function figure(o: FigureOpts = {}): Figure {
     part(el, new THREE.SphereGeometry(0.06, 10, 8), sleeve);
     part(el, new THREE.CapsuleGeometry(0.058, ARM_F - 0.06, 3, 10).translate(0, -ARM_F / 2, 0), sleeve);
     part(el, new THREE.CylinderGeometry(0.062, 0.066, 0.05, 12).translate(0, -ARM_F + 0.04, 0), dirndl || leder ? shirt : coat);
-    part(wr, new THREE.SphereGeometry(0.058, 12, 10).scale(0.62, 1.05, 1).translate(0, -0.035, 0), skin);
-    fingers.position.y = -0.075;
+    part(wr, new THREE.CapsuleGeometry(0.024, 0.032, 4, 14).scale(0.7, 1, 1.85).translate(0.004, -0.036, 0), skin);
+    fingers.position.set(0.004, -0.064, 0);
     wr.add(fingers);
-    for (let k = 0; k < 4; k++) part(fingers, new THREE.CapsuleGeometry(0.0125, 0.045, 2, 6).translate(0, -0.028, 0), skin, 0.01, 0, (k - 1.5) * 0.026);
-    thumb.position.set(0.032, -0.03, s * -0.035);
-    thumb.rotation.set(s * 0.5, 0, 0.6);
+    part(fingers, new THREE.CapsuleGeometry(0.021, 0.014, 4, 14).scale(0.68, 1, 1.8).translate(0, -0.016, 0), skin);
+    tip.position.y = -0.034;
+    fingers.add(tip);
+    part(tip, new THREE.CapsuleGeometry(0.019, 0.008, 4, 14).scale(0.66, 1, 1.75).translate(0, -0.012, 0), skin);
+    thumb.position.set(0.012, -0.03, s * -0.036);
+    thumb.rotation.set(s * 0.35, 0, 0.45);
     wr.add(thumb);
-    part(thumb, new THREE.CapsuleGeometry(0.014, 0.04, 2, 6).translate(0, -0.025, 0), skin);
+    part(thumb, new THREE.CapsuleGeometry(0.0135, 0.022, 4, 10).scale(0.85, 1, 1).translate(0, -0.02, 0), skin);
     palm.position.set(0.035, -PALM, 0);
     wr.add(palm);
-    return { sh, el, wr, fingers, thumb, palm, s };
+    return { sh, el, wr, fingers, tip, thumb, palm, s };
   };
   const arms = [arm(-1), arm(1)];
 
@@ -279,7 +285,7 @@ export function figure(o: FigureOpts = {}): Figure {
 
   let carried: THREE.Object3D | null = null, carryHalf = 0.3;
   const heldBy: (THREE.Object3D | null)[] = [null, null];
-  const side = new THREE.Vector3(), lateral = new THREE.Vector3(), gripAt = [new THREE.Vector3(), new THREE.Vector3()];
+  const side = new THREE.Vector3(), lateral = new THREE.Vector3(), gripAt = [new THREE.Vector3(), new THREE.Vector3()], mixAt = new THREE.Vector3();
   return {
     carry(o, halfWidth = 0.3) { carried = o; carryHalf = halfWidth; },
     hold(hand, prop, offset) {
@@ -351,15 +357,18 @@ export function figure(o: FigureOpts = {}): Figure {
       arms.forEach((a, i) => {
         const R = i === 1, grip = (R ? p.gripR : p.gripL) ?? (carrying ? gripAt[i] : undefined);
         const armA = (R ? p.armR : p.armL) ?? 0, reach = (R ? p.reachR : p.reachL) ?? 0, holding = Math.min(1, Math.max(0, (armA - 0.6) / 0.7)), counter = -Math.sin(ph(i)) * st * 0.8 * (1 - 0.85 * holding);
-        const curl = (R ? p.curlR : p.curlL) ?? (heldBy[i] ? 0.7 : grip ? 0.85 : 0.25 + 0.05 * breath * life);
-        a.fingers.rotation.set(0, 0, curl * 1.5);
-        a.thumb.rotation.set(a.s * 0.5, 0, 0.6 + curl * 0.6);
-        if (grip) { reachTo(a, grip); return; }
+        const mixK = grip ? Math.min(1, Math.max(0, (R ? p.gripMixR : p.gripMixL) ?? 1)) : 0;
+        const curl = (R ? p.curlR : p.curlL) ?? (heldBy[i] ? 0.7 : 0.25 + 0.05 * breath * life + 0.6 * mixK);
+        a.fingers.rotation.set(0, 0, curl * 0.85);
+        a.tip.rotation.set(0, 0, curl * 1.05);
+        a.thumb.rotation.set(a.s * 0.35, 0, 0.45 + curl * 0.6);
+        if (mixK >= 1) { reachTo(a, grip!); return; }
         a.sh.rotation.set(R ? reach : -reach, 0, armA + counter + breath * 0.02 * life);
         a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA));
         const elbow = (R ? p.elbowR : p.elbowL) ?? (0.18 + 0.32 * Math.min(1, Math.max(0, armA) / 2.2) + Math.max(0, Math.sin(ph(i))) * st * 0.5 + 0.03 * Math.sin(t * 0.9 + seed + i) * life);
         a.el.rotation.set(0, 0, elbow);
         a.wr.rotation.set(0, 0, -0.1 - elbow * 0.15);
+        if (mixK > 0) { a.palm.updateWorldMatrix(true, false); reachTo(a, mixAt.setFromMatrixPosition(a.palm.matrixWorld).lerp(grip!, mixK)); }
       });
 
       // Head: turns and nods, a slow drift and a walk-stabilised gaze.

@@ -60,6 +60,24 @@ describe('figure rig', () => {
     }
   });
 
+  it('eases a hand from its own pose onto a grip, continuously, with no jump at either end', () => {
+    const f = figure();
+    f.root.updateMatrixWorld(true);
+    const at = () => { f.root.updateMatrixWorld(true); return new THREE.Vector3().setFromMatrixPosition(f.handR.matrixWorld); };
+    const grip = new THREE.Vector3(0.4, 1.6, 0.3), base = { armR: 0.3, t: 1 };
+    f.pose(base);
+    const free = at();
+    let last = free;
+    for (let k = 0; k <= 1.0001; k += 0.05) {
+      f.pose({ ...base, gripR: grip, gripMixR: k });
+      const now = at();
+      expect(now.distanceTo(free.clone().lerp(grip, k))).toBeLessThan(0.01);
+      expect(now.distanceTo(last)).toBeLessThan(0.06);
+      last = now;
+    }
+    expect(last.distanceTo(grip)).toBeLessThan(0.01);
+  });
+
   it('is a pure function of film time: the same instant always gives the same pose', () => {
     const f = figure({ outfit: 'dirndl', hairStyle: 'braids' }), snap = () => { f.root.updateMatrixWorld(true); const o: number[] = []; f.root.traverse((c) => o.push(...c.matrixWorld.elements)); return o; };
     G.uTime.value = 7.25; f.pose({});
@@ -139,12 +157,13 @@ describe('idle life', () => {
   it('blinks every few seconds, each blink a few frames long, at different times for different people', () => {
     const a = figure({}), b = figure({});
     const shut = (f: ReturnType<typeof figure>) => f.joints.head.children.filter((c) => c.type === 'Group' && c.children.length === 2 && (c as THREE.Group).position.x > 0.2).every((e) => e.scale.y < 0.5);
-    const runs = (f: ReturnType<typeof figure>) => { const out: number[] = []; let n = 0; for (let k = 0; k < 30 * 30; k++) { f.pose({ t: k / 30 }); if (shut(f)) n++; else if (n) { out.push(n); n = 0; } } return out; };
-    const ra = runs(a), rb = runs(b);
+    const starts: number[][] = [[], []];
+    const runs = (f: ReturnType<typeof figure>, s: number[]) => { const out: number[] = []; let n = 0; for (let k = 0; k < 30 * 30; k++) { f.pose({ t: k / 30 }); if (shut(f)) { if (!n) s.push(k); n++; } else if (n) { out.push(n); n = 0; } } return out; };
+    const ra = runs(a, starts[0]); runs(b, starts[1]);
     expect(ra.length).toBeGreaterThanOrEqual(5);
     expect(ra.length).toBeLessThanOrEqual(14);
     for (const n of ra) { expect(n).toBeGreaterThanOrEqual(2); expect(n).toBeLessThanOrEqual(8); }
-    expect(rb.join()).not.toEqual(ra.join());
+    expect(starts[1].join()).not.toEqual(starts[0].join());
   });
 });
 
