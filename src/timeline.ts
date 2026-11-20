@@ -132,6 +132,9 @@ export function timeWarp(segments: { from: number; to: number; filmFrom: number;
 /** Quintic smoothstep over [0, 1]: zero velocity and acceleration at both ends. */
 export const smoother = (t: number) => { const x = clamp(t); return x * x * x * (x * (x * 6 - 15) + 10); };
 
+/** Half linear, half smoothstep: eases in gently but keeps moving at the end, so a camera does not stall before a hard cut. */
+export const cutEase = (t: number) => 0.5 * (clamp(t) + ss(0, 1, t));
+
 /** 0 to 1 linear ramp between `a` and `b`. */
 export const ramp = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
 
