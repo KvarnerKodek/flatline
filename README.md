@@ -66,6 +66,7 @@ has no controls, no watermark and no metadata.
 | `softclouds` | Painted cumulus: lit lobes with bright tops, lavender undersides and a warm rim |
 | `instanced` | `Inst`: thousands of copies in one draw call with per-instance colour, ink outline, wind sway and distance fade |
 | `fx`, `meadow` | Scheduled sprite bursts; a painted meadow ground with a palette |
+| `backing` | `Backings`: invisible camera-facing depth planes behind sprites, cards and banners so the ink lines of the scene behind never scribble through them |
 | `terrain` | `paintedTerrain`: one painted landscape mesh from any height function, with flat building sites, painted paths, patchwork fields, brush streaks, cloud and sun shadow and a relief rim; `valleyHeight`, `flattenSites`, `gridAxis` |
 
 ## Looks
