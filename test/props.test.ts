@@ -71,3 +71,20 @@ describe('freeze', () => {
     expect(new THREE.Vector3().setFromMatrixPosition(mover.matrixWorld).x).toBeCloseTo(7, 9);
   });
 });
+
+describe('cat', () => {
+  it('rests on the ground standing, seated and waving, never floating or sinking', async () => {
+    const { cat } = await import('../src/figure');
+    const c = cat(), low = () => {
+      c.root.updateMatrixWorld(true);
+      let y = Infinity;
+      const v = new THREE.Vector3();
+      c.root.traverse((o) => { const m = o as THREE.Mesh; if (!m.isMesh || m.geometry.type === 'CircleGeometry') return; const p = m.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) y = Math.min(y, v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).y); });
+      return y;
+    };
+    for (const pose of [{ sit: 0 }, { sit: 1 }, { sit: 1, paw: 1 }, { sit: 0.5, tail: 2 }]) {
+      c.pose(pose);
+      expect(Math.abs(low())).toBeLessThan(0.03);
+    }
+  });
+});

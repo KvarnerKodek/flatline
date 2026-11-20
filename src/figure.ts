@@ -99,18 +99,20 @@ export function figure(o: FigureOpts = {}): Figure {
 }
 
 /** `blink` closes the eyes (a slow blink is a cat's hello), `paw` lifts the right forepaw in a wave, `tilt` rolls the head. */
+const isIn = (o: THREE.Object3D, root: THREE.Object3D): boolean => (o === root ? true : o.parent ? isIn(o.parent, root) : false);
+
 export interface CatPose { sit?: number; walk?: number; tail?: number; headYaw?: number; headPitch?: number; blink?: number; paw?: number; tilt?: number }
 export interface Cat { root: THREE.Group; pose(p: CatPose): void }
 
 /**
- * A friendly storybook cat about 0.5 m long, feet at the origin, facing +x: a large head with round amber eyes,
+ * A friendly storybook cat about 0.5 m long that settles onto the ground in any pose (paws and rump rest at y = 0), facing +x: a large head with round amber eyes,
  * a pink nose and a small smile. `collar` adds a collar with a gold tag. `sit` goes from standing (0) to seated (1).
  */
 export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: number): Cat {
   const root = new THREE.Group(), body = new THREE.Group();
   root.add(body);
   shadow(root, 0.32, 0.2);
-  const trunk = new THREE.Group();
+  const trunk = new THREE.Group(), at = new THREE.Vector3();
   trunk.position.set(-0.17, 0.2, 0);
   body.add(trunk);
   part(trunk, new THREE.CapsuleGeometry(0.105, 0.3, 3, 10).rotateZ(Math.PI / 2).translate(0.17, 0.06, 0), fur);
@@ -163,13 +165,13 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
     part(trunk, new THREE.CylinderGeometry(0.024, 0.024, 0.008, 14).rotateZ(Math.PI / 2).rotateY(0.15), 0xf2c14a, 0.405, 0.055, 0);
   }
   const tail: THREE.Group[] = [];
-  let at: THREE.Object3D = trunk;
+  let link: THREE.Object3D = trunk;
   for (let i = 0; i < 6; i++) {
     const g = new THREE.Group();
     g.position.set(i ? -0.085 : -0.02, i ? 0 : 0.08, 0);
     part(g, new THREE.CapsuleGeometry(0.026, 0.07, 2, 6).rotateZ(Math.PI / 2).translate(-0.045, 0, 0), i > 3 ? belly : fur);
-    at.add(g);
-    at = g;
+    link.add(g);
+    link = g;
     tail.push(g);
   }
   return {
@@ -188,7 +190,23 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
       head.rotation.x = p.tilt ?? 0;
       const shut = Math.min(1, Math.max(0, p.blink ?? 0));
       for (const l of lids) { l.visible = shut > 0.02; l.rotation.z = (1 - shut) * 1.6; }
-      tail.forEach((g, i) => { g.rotation.z = (i ? 0.22 : -0.55 + sit * 0.4) + (i > 3 ? 0.35 : 0); g.rotation.y = Math.sin(tw - i * 0.7) * 0.3; });
+      tail.forEach((g, i) => {
+        g.rotation.z = (1 - sit) * ((i ? 0.22 : -0.55) + (i > 3 ? 0.35 : 0)) + sit * (i ? -0.06 : -0.72);
+        g.rotation.y = Math.sin(tw - i * 0.7) * 0.3 * (1 - 0.6 * sit) + sit * (i ? 0.42 : 0.2);
+      });
+      body.position.y = 0;
+      body.updateMatrix();
+      body.updateMatrixWorld(true);
+      const inv = body.matrixWorld.clone().invert(), m = new THREE.Matrix4();
+      let low = Infinity;
+      body.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh || (paw > 0.05 && isIn(o, legs[1]))) return;
+        const pos = mesh.geometry.getAttribute('position');
+        m.multiplyMatrices(inv, mesh.matrixWorld);
+        for (let i = 0; i < pos.count; i += 2) low = Math.min(low, at.fromBufferAttribute(pos, i).applyMatrix4(m).y);
+      });
+      body.position.y = -low;
     },
   };
 }
