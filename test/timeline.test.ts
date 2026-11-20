@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { checkScript, clamp, ease, ss, shiftCamera, V } from '../src/timeline';
+import { bezier, checkScript, clamp, ease, outBack, pulse, ramp, shiftCamera, smoother, ss, V } from '../src/timeline';
 import { DAWN, DAY, NIGHT, mixMood, moodTrack } from '../src/mood';
 import { Placed, place } from '../src/bob';
 import { waveHeight } from '../src/water';
@@ -70,5 +70,26 @@ describe('script checks', () => {
     expect(problems).toMatch(/leaves the film/);
     expect(problems).toMatch(/dash/);
     expect(problems).toMatch(/start at 0/);
+  });
+
+  it('ramps, pulses and pops stay in range and hit their end points', () => {
+    expect(ramp(5, 0, 10)).toBe(0.5);
+    expect(ramp(-1, 0, 10)).toBe(0);
+    expect(smoother(0)).toBe(0);
+    expect(smoother(1)).toBe(1);
+    expect(smoother(0.5)).toBeCloseTo(0.5, 9);
+    expect(pulse(0, 1, 5)).toBe(0);
+    expect(pulse(3, 1, 5)).toBe(1);
+    expect(pulse(6, 1, 5)).toBe(0);
+    expect(outBack(0)).toBeCloseTo(0, 9);
+    expect(outBack(1)).toBeCloseTo(1, 9);
+    expect(Math.max(...Array.from({ length: 21 }, (_, i) => outBack(i / 20)))).toBeGreaterThan(1);
+  });
+
+  it('a Bezier starts and ends on its points and bends towards the control point', () => {
+    const a = V(0, 0, 0), b = V(10, 0, 0), c = V(5, 10, 0);
+    expect(bezier(a, c, b, 0).distanceTo(a)).toBe(0);
+    expect(bezier(a, c, b, 1).distanceTo(b)).toBe(0);
+    expect(bezier(a, c, b, 0.5).y).toBeCloseTo(5, 9);
   });
 });
