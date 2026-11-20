@@ -208,10 +208,57 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
     link = g;
     tail.push(g);
   }
+
+  // A seated cat is its own shape, not a tilted standing one: a pear of a body on rounded haunches, front legs straight
+  // down, hind feet tucked in front and the tail wrapped around the paws.
+  const seated = new THREE.Group();
+  root.add(seated);
+  part(seated, new THREE.SphereGeometry(0.125, 14, 12).scale(0.92, 1.3, 0.95), fur, 0, 0.18, 0);
+  part(seated, new THREE.SphereGeometry(0.135, 14, 10).scale(1.08, 0.72, 1.12), fur, -0.035, 0.095, 0);
+  part(seated, new THREE.SphereGeometry(0.075, 12, 10).scale(0.55, 1.25, 0.95), belly, 0.085, 0.2, 0);
+  for (const s of [-1, 1]) {
+    part(seated, new THREE.SphereGeometry(0.075, 10, 8).scale(1.35, 0.95, 0.7), fur, -0.02, 0.075, s * 0.105);
+    part(seated, new THREE.SphereGeometry(0.04, 8, 6).scale(1.5, 0.7, 1), belly, 0.085, 0.022, s * 0.125);
+  }
+  const fore = [-1, 1].map((s) => {
+    const g = new THREE.Group();
+    g.position.set(0.075, 0.25, s * 0.05);
+    part(g, new THREE.CapsuleGeometry(0.03, 0.17, 3, 8).translate(0, -0.12, 0), fur);
+    part(g, new THREE.SphereGeometry(0.036, 8, 6).scale(1.25, 0.75, 1), belly, 0.012, -0.228, 0);
+    seated.add(g);
+    return g;
+  });
+  const wrap = new THREE.Group();
+  wrap.position.set(-0.02, 0.028, 0);
+  seated.add(wrap);
+  part(wrap, new THREE.TorusGeometry(0.155, 0.027, 8, 28, Math.PI * 1.15).rotateX(-Math.PI / 2).rotateY(Math.PI * 0.62), fur);
+  part(wrap, new THREE.SphereGeometry(0.03, 8, 6), belly, 0.155 * Math.cos(Math.PI * 1.77 - Math.PI), 0, 0.155 * Math.sin(Math.PI * 0.23));
+  const neck = new THREE.Group();
+  neck.position.set(0.03, 0.36, 0);
+  seated.add(neck);
+  if (collar !== undefined) {
+    part(seated, new THREE.TorusGeometry(0.085, 0.017, 6, 18).rotateX(Math.PI / 2).rotateZ(-0.25), collar, 0.025, 0.315, 0);
+    part(seated, new THREE.CylinderGeometry(0.024, 0.024, 0.008, 14).rotateZ(Math.PI / 2), 0xf2c14a, 0.112, 0.28, 0);
+  }
+
   return {
     root,
     pose(p) {
       const sit = p.sit ?? 0, w = p.walk ?? 0, tw = p.tail ?? 0, paw = p.paw ?? 0;
+      const sitting = sit >= 0.5;
+      seated.visible = sitting;
+      body.visible = !sitting;
+      const shut = Math.min(1, Math.max(0, p.blink ?? 0));
+      for (const l of lids) { l.visible = shut > 0.02; l.rotation.z = (1 - shut) * 1.6; }
+      if (sitting) {
+        if (head.parent !== neck) { neck.add(head); head.position.set(0, 0, 0); }
+        head.rotation.set(p.tilt ?? 0, p.headYaw ?? 0, p.headPitch ?? 0);
+        fore[1].rotation.z = paw * (2.2 + 0.25 * Math.sin(tw * 3));
+        fore[1].rotation.x = -paw * 0.3;
+        wrap.rotation.y = Math.sin(tw * 0.6) * 0.06;
+        return;
+      }
+      if (head.parent !== trunk) { trunk.add(head); head.position.set(0.43, 0.19, 0); }
       trunk.rotation.z = sit * 0.82;
       trunk.position.y = 0.2 - sit * 0.07;
       legs.forEach((l, i) => {
@@ -222,8 +269,6 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
       head.rotation.z = -sit * 0.72 + (p.headPitch ?? 0);
       head.rotation.y = p.headYaw ?? 0;
       head.rotation.x = p.tilt ?? 0;
-      const shut = Math.min(1, Math.max(0, p.blink ?? 0));
-      for (const l of lids) { l.visible = shut > 0.02; l.rotation.z = (1 - shut) * 1.6; }
       tail.forEach((g, i) => {
         g.rotation.z = (1 - sit) * ((i ? 0.22 : -0.55) + (i > 3 ? 0.35 : 0)) + sit * (i ? -0.06 : -0.72);
         g.rotation.y = Math.sin(tw - i * 0.7) * 0.3 * (1 - 0.6 * sit) + sit * (i ? 0.42 : 0.2);
