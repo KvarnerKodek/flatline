@@ -198,17 +198,68 @@ function paint(g: THREE.BufferGeometry, c: THREE.Vector3): THREE.BufferGeometry 
   return g.index ? g.toNonIndexed() : g;
 }
 
+const SUN = new THREE.Vector3(0.4, 0.8, 0.3).normalize();
+
+/**
+ * A painted crown: noise-warped clumps around a centre whose normals bend toward the crown's own sphere, so light
+ * falls across the whole canopy in soft cel bands instead of on every facet. Vertex colours run from a cool shaded
+ * underside to a warm sunlit top.
+ */
+function crown(parts: THREE.BufferGeometry[], c: THREE.Vector3, rx: number, ry: number, n: number, base: THREE.Vector3, r: () => number, bend = 0.5) {
+  const shade = base.clone().multiply(new THREE.Vector3(0.62, 0.74, 0.86)), lit = base.clone().multiply(new THREE.Vector3(1.16, 1.12, 0.9)), p = new THREE.Vector3(), q = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const a = i * 2.39996 + r() * 0.6, e = Math.asin(Math.min(0.95, Math.max(-0.6, 1 - 2 * (i + 0.5) / n + (r() - 0.5) * 0.2))), rad = rx * (0.36 + r() * 0.16);
+    const off = new THREE.Vector3(Math.cos(a) * Math.cos(e) * rx * 0.62, Math.sin(e) * ry * 0.62, Math.sin(a) * Math.cos(e) * rx * 0.62);
+    const g = new THREE.IcosahedronGeometry(rad, 1), pos = g.getAttribute('position'), nor = g.getAttribute('normal'), col = new Float32Array(pos.count * 3), ph = r() * 10;
+    for (let k = 0; k < pos.count; k++) {
+      p.fromBufferAttribute(pos, k);
+      const d = p.clone().normalize(), wob = 1 + 0.13 * Math.sin(d.x * 5 + ph) * Math.sin(d.y * 4 - ph) + 0.07 * Math.sin(d.z * 9 + ph * 2);
+      p.multiplyScalar(wob).multiply(new THREE.Vector3(1, 0.86, 1)).add(off).add(c);
+      pos.setXYZ(k, p.x, p.y, p.z);
+      q.copy(p).sub(c).multiply(new THREE.Vector3(1, rx / ry, 1)).normalize().lerp(d, 1 - bend).normalize();
+      nor.setXYZ(k, q.x, q.y, q.z);
+      const lightness = Math.min(1, Math.max(0, 0.55 * q.dot(SUN) + 0.5 * ((p.y - c.y) / ry) + 0.45));
+      const k3 = shade.clone().lerp(lit, lightness * lightness * (3 - 2 * lightness));
+      col.set([k3.x, k3.y, k3.z], k * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.deleteAttribute('uv');
+    parts.push(g);
+  }
+}
+
+/** One tier of a fir: an open cone with a jagged, drooping hem, darker underneath. */
+function firTier(radius: number, height: number, y: number, base: THREE.Vector3, r: () => number): THREE.BufferGeometry {
+  const g = new THREE.ConeGeometry(radius, height, 14, 2, true), pos = g.getAttribute('position'), p = new THREE.Vector3();
+  for (let k = 0; k < pos.count; k++) {
+    p.fromBufferAttribute(pos, k);
+    if (p.y < -height / 2 + 1e-4) { const a = Math.atan2(p.z, p.x), j = 0.18 + 0.22 * Math.abs(Math.sin(a * 7 + radius * 3)) + r() * 0.1; p.y -= j * height * 0.45; p.x *= 1.04; p.z *= 1.04; }
+    pos.setXYZ(k, p.x, p.y + y, p.z);
+  }
+  g.computeVertexNormals();
+  const out = g.toNonIndexed(), op = out.getAttribute('position'), on = out.getAttribute('normal'), col = new Float32Array(op.count * 3), q = new THREE.Vector3();
+  for (let k = 0; k < op.count; k++) {
+    p.fromBufferAttribute(op, k);
+    q.fromBufferAttribute(on, k).lerp(new THREE.Vector3(p.x, 0.6, p.z).normalize(), 0.45).normalize();
+    on.setXYZ(k, q.x, q.y, q.z);
+    const t = Math.min(1, Math.max(0, (p.y - (y - height / 2)) / height)), k3 = base.clone().multiplyScalar(0.72 + 0.4 * t);
+    col.set([k3.x, k3.y, k3.z], k * 3);
+  }
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  out.deleteAttribute('uv');
+  return out;
+}
+
 function tree(kind: TreeKind, r: () => number): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = [], bark = hex(0x6b4a35);
   const green = hex([0x4f9a52, 0x62ad5a, 0x3f8750, 0x7ab85c][Math.floor(r() * 4)]);
   if (kind === 'cypress') {
     parts.push(paint(new THREE.CylinderGeometry(0.16, 0.2, 1.2, 6).translate(0, 0.6, 0), bark));
-    const c = new THREE.ConeGeometry(1.0, 7.5, 9).translate(0, 4.6, 0);
-    parts.push(paint(c, hex(0x2f6b4a)));
+    crown(parts, new THREE.Vector3(0, 4.4, 0), 1.0, 3.6, 6, hex(0x2f6b4a), r, 0.85);
   } else if (kind === 'fir') {
-    parts.push(paint(new THREE.CylinderGeometry(0.2, 0.28, 1.6, 6).translate(0, 0.8, 0), bark));
+    parts.push(paint(new THREE.CylinderGeometry(0.16, 0.26, 1.8, 7).translate(0, 0.9, 0), bark));
     const dark = hex([0x2f6b4a, 0x27603f, 0x35775a][Math.floor(r() * 3)]);
-    for (let i = 0; i < 4; i++) parts.push(paint(new THREE.ConeGeometry(2.3 - i * 0.48, 3.0, 8).translate(0, 2.4 + i * 1.75, 0), dark.clone().multiplyScalar(0.9 + i * 0.07)));
+    for (let i = 0; i < 4; i++) parts.push(firTier(2.3 - i * 0.5, 3.0 - i * 0.2, 2.5 + i * 1.7, dark.clone().multiplyScalar(0.92 + i * 0.07), r));
   } else if (kind === 'palm') {
     const lean = (r() - 0.5) * 0.5;
     for (let i = 0; i < 5; i++) parts.push(paint(new THREE.CylinderGeometry(0.17 - i * 0.012, 0.2 - i * 0.012, 1.3, 6).translate(lean * i * i * 0.12, 0.65 + i * 1.2, 0), bark.clone().multiplyScalar(1.1)));
@@ -219,14 +270,11 @@ function tree(kind: TreeKind, r: () => number): THREE.BufferGeometry[] {
       parts.push(paint(leaf, green.clone().multiplyScalar(0.9 + (k % 2) * 0.16)));
     }
   } else {
-    const th = 1.6 + r() * 1.2;
-    parts.push(paint(new THREE.CylinderGeometry(0.2, 0.3, th, 6).translate(0, th / 2, 0), bark));
-    const n = 3 + Math.floor(r() * 3);
-    for (let i = 0; i < n; i++) {
-      const rad = 1.3 + r() * 0.9;
-      const b = new THREE.IcosahedronGeometry(rad, 1).scale(1, 0.82, 1).translate((r() - 0.5) * 1.9, th + 0.7 + r() * 1.5, (r() - 0.5) * 1.9);
-      parts.push(paint(b, green.clone().multiplyScalar(0.88 + 0.22 * (i / n))));
-    }
+    const th = 1.7 + r() * 1.1, lean = (r() - 0.5) * 0.3;
+    parts.push(paint(new THREE.CylinderGeometry(0.16, 0.3, th + 1.2, 7).translate(0, (th + 1.2) / 2, 0).applyMatrix4(new THREE.Matrix4().makeShear(0, 0, lean * 0.2, 0, 0, 0)), bark));
+    for (const s of [-1, 1]) parts.push(paint(new THREE.CylinderGeometry(0.06, 0.11, 1.3, 5).translate(0, 0.65, 0).rotateZ(s * 0.75).translate(0, th + 0.2, 0), bark));
+    const rx = 2.0 + r() * 0.7;
+    crown(parts, new THREE.Vector3(lean * 0.5, th + rx * 0.95, 0), rx, rx * 0.95, 10 + Math.floor(r() * 4), green, r);
   }
   return parts;
 }
@@ -239,7 +287,6 @@ export function grove(spots: TreeSpot[], seed = 11, ink = 1.6): THREE.Group {
     for (const p of tree(s.kind ?? 'round', r)) parts.push(p.rotateY(yaw).scale(sc, sc, sc).translate(s.x, s.y, s.z));
   }
   const g = mergeGeometries(parts)!;
-  g.computeVertexNormals();
   const group = new THREE.Group();
   group.add(new THREE.Mesh(g, toon({ vertexColors: true, spec: 0 })), new THREE.Mesh(g, outline(ink)));
   return group;
