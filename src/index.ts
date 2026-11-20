@@ -24,3 +24,6 @@ export * from './shadow';
 export * from './look';
 export * from './edges';
 export * from './softclouds';
+export * from './instanced';
+export * from './fx';
+export * from './meadow';
