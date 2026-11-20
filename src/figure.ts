@@ -349,7 +349,7 @@ export function figure(o: FigureOpts = {}): Figure {
 /** `blink` closes the eyes (a slow blink is a cat's hello), `paw` lifts the right forepaw in a wave, `tilt` rolls the head. */
 const isIn = (o: THREE.Object3D, root: THREE.Object3D): boolean => (o === root ? true : o.parent ? isIn(o.parent, root) : false);
 
-export interface CatPose { sit?: number; walk?: number; tail?: number; headYaw?: number; headPitch?: number; blink?: number; paw?: number; tilt?: number }
+export interface CatPose { sit?: number; walk?: number; tail?: number; headYaw?: number; headPitch?: number; blink?: number; paw?: number; tilt?: number; /** film time for ear flicks, breathing and an idle blink; defaults to `G.uTime` */ t?: number }
 export interface Cat { root: THREE.Group; pose(p: CatPose): void }
 
 /**
@@ -378,11 +378,15 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
   trunk.add(head);
   part(head, new THREE.SphereGeometry(0.135, 14, 11).scale(0.95, 0.88, 1.12), fur);
   part(head, new THREE.SphereGeometry(0.06, 10, 8).scale(0.9, 0.7, 1.35), belly, 0.085, -0.045, 0);
-  const lids: THREE.Mesh[] = [];
+  const lids: THREE.Mesh[] = [], ears: THREE.Group[] = [];
   const bit = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); head.add(m); return m; };
   for (const s of [-1, 1]) {
-    part(head, new THREE.ConeGeometry(0.055, 0.12, 4).rotateY(Math.PI / 4).rotateX(s * -0.25), fur, -0.01, 0.125, s * 0.075);
-    bit(new THREE.ConeGeometry(0.032, 0.075, 4).rotateY(Math.PI / 4).rotateX(s * -0.25), 0xf2a6a0, 0.012, 0.118, s * 0.073);
+    const ear = new THREE.Group();
+    ear.position.set(-0.01, 0.1, s * 0.07);
+    head.add(ear);
+    ears.push(ear);
+    part(ear, new THREE.ConeGeometry(0.055, 0.12, 4).rotateY(Math.PI / 4).rotateX(s * -0.25).translate(0, 0.03, s * 0.006), fur);
+    part(ear, new THREE.ConeGeometry(0.032, 0.075, 4).rotateY(Math.PI / 4).rotateX(s * -0.25).translate(0.022, 0.022, s * 0.004), 0xf2a6a0);
     const e = new THREE.Group();
     e.position.set(0.108, 0.022, s * 0.05);
     head.add(e);
@@ -438,7 +442,11 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
     const g = new THREE.Group();
     g.position.set(0.075, 0.25, s * 0.05);
     part(g, new THREE.CapsuleGeometry(0.03, 0.17, 3, 8).translate(0, -0.12, 0), fur);
-    part(g, new THREE.SphereGeometry(0.036, 8, 6).scale(1.25, 0.75, 1), belly, 0.012, -0.228, 0);
+    const pawJ = new THREE.Group();
+    pawJ.position.y = -0.21;
+    g.add(pawJ);
+    part(pawJ, new THREE.SphereGeometry(0.036, 10, 8).scale(1.25, 0.75, 1), belly, 0.012, -0.018, 0);
+    g.userData.paw = pawJ;
     seated.add(g);
     return g;
   });
@@ -446,7 +454,12 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
   wrap.position.set(-0.02, 0.028, 0);
   seated.add(wrap);
   part(wrap, new THREE.TorusGeometry(0.155, 0.027, 8, 28, Math.PI * 1.15).rotateX(-Math.PI / 2).rotateY(Math.PI * 0.62), fur);
-  part(wrap, new THREE.SphereGeometry(0.03, 8, 6), belly, 0.155 * Math.cos(Math.PI * 1.77 - Math.PI), 0, 0.155 * Math.sin(Math.PI * 0.23));
+  const tip = new THREE.Group();
+  tip.position.set(0.155 * Math.cos(Math.PI * 0.77), 0.004, 0.155 * Math.sin(Math.PI * 0.23));
+  tip.rotation.y = -0.6;
+  wrap.add(tip);
+  part(tip, new THREE.CapsuleGeometry(0.024, 0.06, 3, 8).rotateZ(Math.PI / 2).translate(0.04, 0, 0), fur);
+  part(tip, new THREE.SphereGeometry(0.028, 10, 8), belly, 0.09, 0, 0);
   const neck = new THREE.Group();
   neck.position.set(0.03, 0.36, 0);
   seated.add(neck);
@@ -463,14 +476,26 @@ export function cat(fur = 0xe8a04a, belly = 0xfff3dc, eye = 0xd99a2b, collar?: n
       const sitting = sit >= 0.5;
       seated.visible = sitting;
       body.visible = !sitting;
-      const shut = Math.min(1, Math.max(0, p.blink ?? 0));
+      const t = p.t ?? G.uTime.value;
+      // A cat's own blink: a slow one every few seconds unless the film asks for a particular blink.
+      const since = (fract(t / 4.1 + 0.3) - 0.2) * 4.1, own = since > 0 && since < 0.45 ? Math.sin((since / 0.45) * Math.PI) : 0;
+      const shut = Math.min(1, Math.max(0, p.blink ?? own));
       for (const l of lids) { l.visible = shut > 0.02; l.rotation.z = (1 - shut) * 1.6; }
+      // Ears flick now and then, each on its own clock; ears and head stay alive between the film's cues.
+      ears.forEach((e, i) => {
+        const k = Math.floor(t / 2.3 + i * 0.47), u = (fract(t / 2.3 + i * 0.47) - 0.6 * hash(k + i * 9)) * 2.3, flick = u > 0 && u < 0.28 ? Math.sin((u / 0.28) * Math.PI) : 0;
+        e.rotation.set((i ? -1 : 1) * (0.12 + 0.5 * flick), 0, -0.25 * flick);
+      });
+      const breath = Math.sin(t * 2.3);
       if (sitting) {
         if (head.parent !== neck) { neck.add(head); head.position.set(0, 0, 0); }
-        head.rotation.set(p.tilt ?? 0, p.headYaw ?? 0, p.headPitch ?? 0);
+        head.rotation.set((p.tilt ?? 0) + Math.sin(t * 0.7) * 0.03, (p.headYaw ?? 0) + Math.sin(t * 0.43 + 1) * 0.05, (p.headPitch ?? 0) + Math.sin(t * 0.9) * 0.02);
+        seated.scale.set(1 + breath * 0.012, 1 + breath * 0.006, 1 + breath * 0.012);
         fore[1].rotation.z = paw * (2.2 + 0.25 * Math.sin(tw * 3));
         fore[1].rotation.x = -paw * 0.3;
+        (fore[1].userData.paw as THREE.Group).rotation.z = paw * (0.55 + 0.35 * Math.sin(tw * 3 + 0.8));
         wrap.rotation.y = Math.sin(tw * 0.6) * 0.06;
+        tip.rotation.set(0, -0.6 + Math.sin(tw * 0.9) * 0.25, 0.35 + 0.45 * Math.max(0, Math.sin(t * 0.8 + 2)) + Math.sin(tw * 1.7) * 0.15);
         return;
       }
       if (head.parent !== trunk) { trunk.add(head); head.position.set(0.43, 0.19, 0); }
