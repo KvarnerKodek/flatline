@@ -26,6 +26,7 @@ declare global {
 
 /**
  * Plays a film in the page. URL switches: `?t=40` start time, `?still` render once and stop,
+ * `?cam=x,y,z,lx,ly,lz[,fov]` look from a fixed camera instead of the film's, to inspect any spot,
  * `?render` hide the controls for frame capture, `?embed` start paused and report to a parent page.
  * `window.__flatline.seek(t)` renders any instant.
  *
@@ -52,6 +53,10 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
   const embed = q.has('embed');
   if (render3d) document.body.classList.add('render');
   if (embed) document.body.classList.add('embed');
+  if (film.letterbox) {
+    document.body.classList.add('letterbox');
+    document.body.style.setProperty('--lb', String(film.letterbox));
+  }
 
   let W = innerWidth, Hh = innerHeight;
   let dprCap = Math.min(devicePixelRatio || 1, W < 800 ? 1.5 : 2);
@@ -93,10 +98,12 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
     else if (e.code === 'KeyR') { t = 0; playing = true; hud.setPlaying(true); }
   });
 
-  const follow = film.follow?.(world) ?? [];
+  const follow = film.follow?.(world) ?? [], sun = film.sun?.(world);
+  const inspect = q.get('cam')?.split(',').map(Number);
   const render = (now: number) => {
     G.uTime.value = film.warp ? film.warp(t) : t;
     const f = film.frame(world, film.warp ? film.warp(t) : t);
+    if (inspect) { f.cam.p.set(inspect[0], inspect[1], inspect[2]); f.cam.look.set(inspect[3], inspect[4], inspect[5]); if (inspect[6]) f.cam.fov = inspect[6]; }
     camera.position.copy(f.cam.p);
     camera.lookAt(f.cam.look);
     const wide = Math.min(1.7, Math.max(1, 1 + (1.2 - camera.aspect) * 1.1));
@@ -105,7 +112,9 @@ export async function play<W>(film: Film<W>, base = './', fallback?: () => void,
     camera.updateMatrixWorld();
     for (const o of follow) o.position.set(camera.position.x, o.userData.followY ?? camera.position.y, camera.position.z);
     hud.update(t, f.tracks, camera, W, Hh);
-    post.render(now / 1000, f.fade, f.night);
+    scene.updateMatrixWorld();
+    sun?.render(renderer, scene);
+    post.render(now / 1000, f.fade, f.night, f.flash ?? 0);
     if (card && film.endCard) {
       const ca = Math.min(1, Math.max(0, (t - film.endCard.at + 1.2) / 1.8));
       card.style.opacity = String(ca);

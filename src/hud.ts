@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-export interface Caption { t0: number; t1: number; k: string; h: string; p?: string }
+/** `cls` adds a style: `title` centres the caption as a title card, `quiet` shows only the small line. */
+export interface Caption { t0: number; t1: number; k: string; h: string; p?: string; cls?: string }
 export interface Chapter { t: number; name: string }
 
 const el = (tag: string, cls?: string, html?: string) => {
@@ -39,7 +40,7 @@ export class Hud {
     this.root.append(...(brand ? [el('div', 'mark', brand)] : []), this.chap, this.pip);
     this.pip.style.opacity = '0';
     for (const c of captions) {
-      const e = el('div', 'cap', `<div class="k">${c.k}</div><h2>${c.h}</h2>${c.p ? `<p>${c.p}</p>` : ''}`);
+      const e = el('div', c.cls ? `cap ${c.cls}` : 'cap', `<div class="k">${c.k}</div><h2>${c.h}</h2>${c.p ? `<p>${c.p}</p>` : ''}`);
       e.style.opacity = '0';
       this.root.append(e);
       this.caps.push({ c, e });

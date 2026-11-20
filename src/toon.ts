@@ -14,10 +14,15 @@ export const G = {
   uNight: { value: 1 },
   uRes: { value: new THREE.Vector2(1, 1) },
   uSea: { value: 1 },
+  /** 1 darkens surfaces near y = 0 as if a sea lapped at them; set 0 for a film on dry land. */
+  uWaterline: { value: 1 },
+  uShadowMap: { value: null as THREE.Texture | null },
+  uShadowMat: { value: new THREE.Matrix4() },
+  uShadowOn: { value: 0 },
 };
 
 export const COMMON = /* glsl */ `
-uniform float uTime, uFogD, uNight, uSea;
+uniform float uTime, uFogD, uNight, uSea, uWaterline;
 uniform vec3 uLightDir, uLightCol, uAmb, uShadow, uRim, uFog;
 uniform vec2 uRes;
 float hash11(float p){ p = fract(p*.1031); p *= p+33.33; p *= p+p; return fract(p); }
@@ -29,7 +34,8 @@ vec3 applyFog(vec3 c, float d){ float f = 1.-exp(-pow(d*uFogD,1.35)); return mix
 `;
 
 const TOON_VS = /* glsl */ `
-varying vec3 vN; varying vec3 vW; varying vec3 vC;
+varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS;
+uniform mat4 uShadowMat;
 #ifdef ICOL
 attribute vec3 iColor;
 #endif
@@ -46,19 +52,31 @@ void main(){
   #ifdef ICOL
   vC = iColor;
   #endif
+  vS = uShadowMat*vec4(w.xyz + vN*.16, 1.);
   gl_Position = projectionMatrix*viewMatrix*w;
 }`;
 
 const TOON_FS = /* glsl */ `
 ${COMMON}
-varying vec3 vN; varying vec3 vW; varying vec3 vC;
-uniform vec3 uBase; uniform float uVC, uEmis, uSpec, uAlpha, uEmisN;
-uniform vec3 uEmisCol;
+varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS;
+uniform vec3 uBase; uniform float uVC, uEmis, uSpec, uAlpha, uEmisN, uGrain, uShadowOn;
+uniform vec3 uEmisCol; uniform sampler2D uShadowMap;
+float sunShadow(){
+  if (uShadowOn < .5) return 0.;
+  vec3 p = vS.xyz/vS.w*.5+.5;
+  if (p.z > 1.) return 0.;
+  float edge = smoothstep(0., .05, min(min(p.x, 1.-p.x), min(p.y, 1.-p.y)));
+  float s = 0.;
+  for (int i=0;i<4;i++){ vec2 o = (vec2(float(i/2), mod(float(i),2.))-.5)/2600.; s += step(texture2D(uShadowMap, p.xy+o).r + .00004, p.z); }
+  return s*.25*edge;
+}
 void main(){
   vec3 base = mix(uBase, vC, uVC);
+  base *= 1. + uGrain*((step(.5, vnoise(vW.xz*.55))-.5)*.07 + (vnoise(vW.xz*.07)-.5)*.16 + (step(.62, vnoise(vW.xz*2.3+7.))-.3)*.035);
   vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vW);
   float nl = dot(n, uLightDir);
+  nl = mix(nl, min(nl, -.2), sunShadow());
   float hemi = n.y*.5+.5;
   float b1 = smoothstep(-.06,.0,nl), b2 = smoothstep(.34,.4,nl);
   vec3 shade = base*(uShadow*(.7+.3*hemi)+uAmb*.22);
@@ -69,7 +87,7 @@ void main(){
   float edge1 = smoothstep(-.06,.0,nl) - smoothstep(.0,.06,nl);
   col += uShadow*.35*edge1*base;
   float wl = smoothstep(-.2,1.1,vW.y);
-  col *= mix(.72, 1., wl);
+  col *= mix(1., mix(.72, 1., wl), uWaterline);
   col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
   float rim = pow(1.-max(dot(n,v),0.),3.);
   col += uRim*smoothstep(.46,.52,rim)*(.3+.7*hemi)*mix(.38,.75,uNight);
@@ -91,6 +109,8 @@ export interface ToonOpts {
   spec?: number;
   alpha?: number;
   side?: THREE.Side;
+  /** Painted variation across the ground plane, for land and other broad surfaces. */
+  grain?: number;
 }
 
 export function toon(o: ToonOpts = {}): THREE.ShaderMaterial {
@@ -104,6 +124,7 @@ export function toon(o: ToonOpts = {}): THREE.ShaderMaterial {
       uEmisCol: { value: hex(o.emissive ?? 0xffffff) },
       uSpec: { value: o.spec ?? 0.1 },
       uAlpha: { value: o.alpha ?? 1 },
+      uGrain: { value: o.grain ?? 0 },
     },
     vertexShader: TOON_VS,
     fragmentShader: TOON_FS,

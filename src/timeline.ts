@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Caption, Chapter, TrackSpec } from './hud';
+import type { SunShadow } from './shadow';
 
 export type { Caption, Chapter, TrackSpec };
 
@@ -26,6 +27,8 @@ export interface Frame {
   /** 0 day, 1 night; steers bloom and grade. */
   night: number;
   tracks: TrackSpec[];
+  /** White added to the whole picture, for lightning or a burst of light. */
+  flash?: number;
 }
 
 export const newFrame = (): Frame => ({ cam: { p: V(), look: V(), fov: 40 }, fade: 0, night: 0, tracks: [] });
@@ -55,6 +58,10 @@ export interface Film<W> {
   frame(world: W, t: number): Frame;
   /** Maps playback time to film time (see `timeWarp`); the HUD and captions stay on playback time. */
   warp?(t: number): number;
+  /** Sun shadows to draw before each frame; aim them from `frame`. */
+  sun?(world: W): SunShadow;
+  /** Crop the picture to this aspect ratio with black bars, such as 2.39 for widescreen cinema. */
+  letterbox?: number;
   /** Playback time at which the film proper ends and the end card is fully shown. */
   endCard?: { html: string; at: number };
   /** Optional extra drawing straight onto the canvas after post-processing, for inset views. */

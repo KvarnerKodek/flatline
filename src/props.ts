@@ -356,13 +356,20 @@ export function buoy(color = 0xd8392b, lamp = 0xff4a3a): Craft {
   return { root: wrap(root), lamps: [l], length: 1 };
 }
 
-export function lighthouse(): THREE.Group {
+/** The door faces +x. */
+export function lighthouse(door = 0x6b4a35): THREE.Group {
   const m = new Mesher();
   m.cyl(0, 0, 0, 22, 4, hex(0xe9ecee), 12, 2.6);
   m.cyl(0, 6, 0, 8, 3.4, hex(0xc7372f), 12, 3.2);
   m.cyl(0, 13, 0, 15, 3.1, hex(0xc7372f), 12, 2.9);
   m.cyl(0, 22, 0, 24.5, 3.1, hex(0x2b3138), 12, 3.1);
   m.cyl(0, 24.5, 0, 27, 2.0, hex(0xc7372f), 12, 0.1);
+  m.cyl(0, 21.6, 0, 22, 3.9, hex(0x2b3138), 12, 3.9);
+  m.box(3.86, 1.35, 0, 0.3, 2.7, 1.5, hex(door));
+  m.box(3.9, 2.85, 0, 0.46, 0.3, 2.0, hex(0xc9c2b4));
+  m.box(4.5, 0.12, 0, 1.6, 0.24, 2.6, hex(0xa39c90));
+  m.box(3.42, 9.6, 0, 0.3, 1.3, 0.8, hex(0x27384d));
+  m.box(2.98, 16.4, 0, 0.3, 1.3, 0.8, hex(0x27384d));
   const g = finish(m);
   const l = glow(0xffe9a8, 14, 1);
   l.position.y = 23.3;

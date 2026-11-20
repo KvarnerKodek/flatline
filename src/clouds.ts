@@ -35,6 +35,7 @@ export function makeClouds(count = 11, seed = 7): Clouds {
     const g = puff(r);
     const m = new THREE.Group();
     m.add(new THREE.Mesh(g, mat), new THREE.Mesh(g, ink));
+    m.children[0].userData.noShadow = true;
     group.add(m);
     items.push({ m, a0: r() * Math.PI * 2, rad: 3200 + r() * 3200, h: 520 + r() * 520, speed: 0.0009 + r() * 0.0007, s: 1.1 + r() * 1.5 });
   }

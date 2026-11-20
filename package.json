@@ -13,7 +13,8 @@
   },
   "bin": {
     "flatline-render": "bin/render.mjs",
-    "flatline-check": "bin/check.mjs"
+    "flatline-check": "bin/check.mjs",
+    "flatline-stills": "bin/stills.mjs"
   },
   "files": [
     "src",
