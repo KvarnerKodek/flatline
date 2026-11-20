@@ -1,7 +1,7 @@
 # Area brief (fill in and send as the agent prompt)
 
 You are one of N parallel agents polishing <film> at <project path> (Vite + three + flatline). The user's bar:
-<the user's words, e.g. no glitches, story that does X>. Standing directions: <quote them>.
+<award-level visuals, no glitches, story that does X, in the user's words>. Standing directions: <quote them>.
 
 READ FIRST: BIBLE.md, previous logs `iterations/*<area>*.md`, `iterations/*findings*.md`, the files you own.
 
