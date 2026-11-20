@@ -87,3 +87,26 @@ describe('garments', () => {
     expect(outward / total).toBeGreaterThan(0.95);
   });
 });
+
+describe('carry', () => {
+  it('puts both palms on the sides of a carried object whenever both arms are lifted, and lets go when they drop', () => {
+    const f = figure({ outfit: 'lederhosen' });
+    const wheel = new THREE.Object3D();
+    wheel.position.set(0.42, 0.5, 0);
+    f.joints.spine.add(wheel);
+    f.carry(wheel, 0.3);
+    f.root.position.set(3, 1, 2); f.root.rotation.y = 1.1;
+    const at = (o: THREE.Object3D) => new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    for (const w of [0, 1.3, 2.9]) {
+      f.pose({ walk: w, stride: 0.5, armL: 1.5, armR: 1.5, t: 1 });
+      f.root.updateMatrixWorld(true);
+      const c = at(wheel);
+      expect(at(f.handL).distanceTo(c)).toBeCloseTo(0.3, 1);
+      expect(at(f.handR).distanceTo(c)).toBeCloseTo(0.3, 1);
+      expect(at(f.handL).distanceTo(at(f.handR))).toBeCloseTo(0.6, 1);
+    }
+    f.pose({ armL: 0, armR: 0, t: 1 });
+    f.root.updateMatrixWorld(true);
+    expect(at(f.handR).distanceTo(at(wheel))).toBeGreaterThan(0.35);
+  });
+});

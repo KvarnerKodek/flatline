@@ -55,6 +55,11 @@ export interface FigurePose {
 /** `hand` is the right palm (kept for older films); `handL`/`handR` are the palms, where props are attached. */
 export interface Figure {
   root: THREE.Group; hand: THREE.Object3D; handL: THREE.Object3D; handR: THREE.Object3D; pose(p: FigurePose): void;
+  /**
+   * Holds `o` (attached anywhere on the figure) in both hands: whenever both arms are lifted forward and no grip is
+   * given, the palms take its sides, `halfWidth` metres either side of its centre. Pass null to let go.
+   */
+  carry(o: THREE.Object3D | null, halfWidth?: number): void;
   /** The skeleton, for films that need a joint: `legs[i].ankle`, `arms[i].wr` and so on (index 0 is left). */
   joints: { pelvis: THREE.Group; spine: THREE.Group; neck: THREE.Group; head: THREE.Group; legs: { hip: THREE.Group; knee: THREE.Group; ankle: THREE.Group }[]; arms: { sh: THREE.Group; el: THREE.Group; wr: THREE.Group }[] };
 }
@@ -258,7 +263,10 @@ export function figure(o: FigureOpts = {}): Figure {
     a.wr.rotation.set(0, 0, WRIST);
   };
 
+  let carried: THREE.Object3D | null = null, carryHalf = 0.3;
+  const side = new THREE.Vector3(), lateral = new THREE.Vector3(), gripAt = [new THREE.Vector3(), new THREE.Vector3()];
   return {
+    carry(o, halfWidth = 0.3) { carried = o; carryHalf = halfWidth; },
     root, hand: arms[1].palm, handL: arms[0].palm, handR: arms[1].palm, joints: { pelvis, spine, neck, head, legs, arms },
     pose(p) {
       const t = p.t ?? G.uTime.value, w = p.walk ?? 0, st = Math.min(1.2, Math.max(0, p.stride ?? 0));
@@ -290,9 +298,17 @@ export function figure(o: FigureOpts = {}): Figure {
       if (skirt) { skirt.rotation.set(Math.sin(w - 0.9) * st * 0.12 + shift * 0.02 * life, 0, -Math.sin(w * 2 - 1.2) * st * 0.05); skirt.scale.set(1 + st * 0.05, 1, 1 + st * 0.05); }
 
       // Arms: counter swing in a walk; a natural elbow bend unless a grip target asks for IK.
+      const carrying = !!carried && !p.gripL && !p.gripR && (p.armL ?? 0) > 0.8 && (p.armR ?? 0) > 0.8;
+      if (carrying) {
+        root.updateMatrixWorld(true);
+        carried!.getWorldPosition(side);
+        lateral.set(0, 0, 1).transformDirection(spine.matrixWorld);
+        gripAt[0].copy(side).addScaledVector(lateral, -carryHalf);
+        gripAt[1].copy(side).addScaledVector(lateral, carryHalf);
+      }
       arms.forEach((a, i) => {
-        const R = i === 1, grip = R ? p.gripR : p.gripL;
-        const armA = (R ? p.armR : p.armL) ?? 0, reach = (R ? p.reachR : p.reachL) ?? 0, counter = -Math.sin(ph(i)) * st * 0.8;
+        const R = i === 1, grip = (R ? p.gripR : p.gripL) ?? (carrying ? gripAt[i] : undefined);
+        const armA = (R ? p.armR : p.armL) ?? 0, reach = (R ? p.reachR : p.reachL) ?? 0, holding = Math.min(1, Math.max(0, (armA - 0.6) / 0.7)), counter = -Math.sin(ph(i)) * st * 0.8 * (1 - 0.85 * holding);
         const curl = (R ? p.curlR : p.curlL) ?? (grip ? 0.85 : 0.25 + 0.05 * breath * life);
         a.fingers.rotation.set(0, 0, curl * 1.5);
         a.thumb.rotation.set(a.s * 0.5, 0, 0.6 + curl * 0.6);
