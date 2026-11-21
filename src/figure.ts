@@ -234,16 +234,17 @@ export function figure(o: FigureOpts = {}): Figure {
   const face = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number, parent: THREE.Object3D = head) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); parent.add(m); return m; };
   for (const s of [-1, 1]) {
     const e = new THREE.Group();
-    e.position.set(0.212, 0.012, s * 0.082);
+    e.position.set(0.205, 0.012, s * 0.082);
     head.add(e);
     face(new THREE.SphereGeometry(0.031, 12, 10).scale(0.6, 1.2, 1), 0x1b0f00, 0, 0, 0, e);
     face(new THREE.SphereGeometry(0.0095, 8, 6), 0xffffff, 0.017, 0.013, s * -0.004, e);
     face(new THREE.SphereGeometry(0.0045, 8, 6), 0xffffff, 0.0168, -0.012, s * 0.008, e);
     eyes.push(e);
-    brows.push(face(new THREE.TorusGeometry(0.05, 0.0072, 5, 12, Math.PI * 0.38).rotateZ(Math.PI * 0.31).translate(0, -0.05, 0).rotateY(Math.PI / 2), hair, 0.216, 0.072, s * 0.084));
+    brows.push(face(new THREE.TorusGeometry(0.05, 0.0072, 5, 12, Math.PI * 0.38).rotateZ(Math.PI * 0.31).translate(0, -0.05, 0).rotateY(Math.PI / 2), hair, 0.207, 0.072, s * 0.084));
+    brows[brows.length - 1].rotation.y = -s * 0.37;
     face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
   }
-  face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.2, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.226, -0.028, 0);
+  face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.3, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.214, -0.028, 0);
   const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.21, -0.095, 0);
   const grin = face(new THREE.SphereGeometry(0.03, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.3, 0.62, 1), 0x5a1a16, 0.206, -0.089, 0);
   let feather: THREE.Group | undefined;
