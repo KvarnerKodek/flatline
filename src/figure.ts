@@ -205,7 +205,7 @@ export function figure(o: FigureOpts = {}): Figure {
   part(head, new THREE.SphereGeometry(0.05, 10, 8).scale(1, 0.75, 1.5), skin, 0.15, -0.11, 0);
   const hair = o.hair ?? 0x3b2a20;
   part(head, new THREE.SphereGeometry(0.247, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.56).rotateZ(0.5), hair, -0.012, 0.012, 0);
-  part(head, new THREE.SphereGeometry(0.16, 14, 10).scale(0.55, 0.42, 1.2), hair, 0.12, 0.2, 0);
+  part(head, new THREE.SphereGeometry(0.243, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.24).rotateZ(-0.3).rotateX(0.22), hair);
   for (const s of [-1, 1]) {
     part(head, new THREE.SphereGeometry(0.045, 10, 8).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.225);
     part(head, new THREE.SphereGeometry(0.11, 12, 8).scale(0.9, 1.05, 0.55), hair, -0.03, 0.04, s * 0.19);
