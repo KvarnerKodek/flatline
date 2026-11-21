@@ -204,11 +204,13 @@ export function figure(o: FigureOpts = {}): Figure {
   head.position.y = 0.2;
   neck.add(head);
   part(head, new THREE.SphereGeometry(0.23, 28, 20).scale(1, 0.98, 1), skin);
-  const hair = o.hair ?? 0x3b2a20;
+  const hsl = new THREE.Color(o.hair ?? 0x3b2a20).getHSL({ h: 0, s: 0, l: 0 });
+  /** Near-black hair has no cel form left in shadow, so it keeps at least a dark-brown lightness. */
+  const hair = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(hsl.l, 0.22)).getHex();
   part(head, new THREE.SphereGeometry(0.247, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.56).rotateZ(0.5), hair, -0.012, 0.012, 0);
   part(head, new THREE.SphereGeometry(0.243, 28, 8, 0, Math.PI * 2, 0, Math.PI * 0.24).rotateZ(-0.3).rotateX(0.22), hair);
   for (const s of [-1, 1]) {
-    part(head, new THREE.SphereGeometry(0.045, 10, 8).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.225);
+    part(head, new THREE.SphereGeometry(0.045, 10, 8).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.235);
     part(head, new THREE.SphereGeometry(0.11, 18, 14).scale(0.9, 1.05, 0.55), hair, -0.03, 0.04, s * 0.19);
   }
   if (o.hairStyle === 'bun') part(head, new THREE.SphereGeometry(0.1, 12, 10), hair, -0.2, 0.12, 0);
