@@ -43,12 +43,12 @@ export function makeSoftClouds(o: SoftCloudOpts = {}): SoftClouds {
   const light = new THREE.Vector3(...(o.light ?? [1, 1, 1])), mid = new THREE.Vector3(...(o.mid ?? [0.97, 0.975, 1])), shade = new THREE.Vector3(...(o.shade ?? [0.76, 0.79, 0.96]));
   const mat = new THREE.ShaderMaterial({
     uniforms: { ...G, uCl: { value: light }, uCm: { value: mid }, uCs: { value: shade } },
-    vertexShader: 'varying vec3 vN; varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }',
+    vertexShader: 'varying vec3 vN; varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; vN = mat3(modelMatrix)*normal; gl_Position = projectionMatrix*viewMatrix*w; }',
     fragmentShader: /* glsl */ `
       ${COMMON}
       uniform vec3 uCl, uCm, uCs; varying vec3 vN; varying vec3 vW;
       void main(){
-        vec3 n = normalize(vN), v = normalize(cameraPosition - vW);
+        vec3 n = unit(vN), v = normalize(cameraPosition - vW);
         float nl = dot(n, uLightDir);
         float wash = fbm(vW.xz*.004 + vW.y*.01) - .5;
         vec3 col = mix(uCs, uCm, smoothstep(-.45,.05,nl + wash*.25));

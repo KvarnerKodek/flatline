@@ -157,7 +157,7 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
       float segDist(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-4),0.,1.); return length(pa-ba*h); }
       void main(){
         vec2 p = vW.xz; float dist = length(vW - cameraPosition);
-        vec3 n = normalize(vN);
+        vec3 n = unit(vN);
         float n1 = fbm(p*.009), n2 = fbm(p*.04+7.), n3 = fbm(p*.22+3.);
         vec3 g1 = uGrass[0], g2 = uGrass[1], g3 = uGrass[2], g4 = uGrass[3];
         float detail = 1. - smoothstep(60.,260.,dist);

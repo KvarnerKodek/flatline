@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
-import { G, INK } from './toon';
+import { G, INK, UNIT } from './toon';
 
 /**
  * Screen-space ink: lines from depth discontinuities and normal creases of an opaque depth/normal pass.
@@ -87,20 +87,22 @@ export const setHaze = (o: HazeOpts = {}) => {
 };
 
 const DEPTH_FS = /* glsl */ `
+${UNIT}
 varying vec3 vN; varying vec3 vW; uniform float uFol;
 void main(){
-  vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
+  vec3 n = unit(vN); if (!gl_FrontFacing) n = -n;
   vec3 vn = mat3(viewMatrix)*n;
   gl_FragColor = vec4(vn.xy, uFol, -(viewMatrix*vec4(vW,1.)).z);
 }`;
 const PLAIN_VS = /* glsl */ `
+${UNIT}
 varying vec3 vN; varying vec3 vW;
 void main(){
   vec4 p = vec4(position,1.); vec3 n = normal;
   #ifdef USE_INSTANCING
   p = instanceMatrix*p; n = mat3(instanceMatrix)*n;
   #endif
-  vec4 w = modelMatrix*p; vW = w.xyz; vN = normalize(mat3(modelMatrix)*n);
+  vec4 w = modelMatrix*p; vW = w.xyz; vN = unit(mat3(modelMatrix)*n);
   gl_Position = projectionMatrix*viewMatrix*w;
 }`;
 

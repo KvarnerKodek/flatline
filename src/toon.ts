@@ -32,7 +32,11 @@ export const G = {
   uOutlineK: { value: 1 },
 };
 
+/** Normalises a vector without ever dividing by zero: a normal interpolated to zero would otherwise be NaN, and bloom spreads one NaN pixel into a black block. */
+export const UNIT = /* glsl */ `vec3 unit(vec3 v){ return v*inversesqrt(max(dot(v,v),1e-12)); }`;
+
 export const COMMON = /* glsl */ `
+${UNIT}
 uniform float uTime, uFogD, uNight, uSea, uWaterline, uPaint, uSoft, uSpecK, uRimK, uOutlineK;
 uniform vec3 uLightDir, uLightCol, uAmb, uShadow, uRim, uFog;
 uniform vec2 uRes;
@@ -45,6 +49,7 @@ vec3 applyFog(vec3 c, float d){ float f = 1.-exp(-pow(d*uFogD,1.35)); return mix
 `;
 
 const TOON_VS = /* glsl */ `
+${UNIT}
 varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
 uniform mat4 uShadowMat, uShadowMatN;
 #ifdef ICOL
@@ -55,7 +60,7 @@ void main(){
   #ifdef USE_INSTANCING
   p = instanceMatrix*p; n = mat3(instanceMatrix)*n;
   #endif
-  vec4 w = modelMatrix*p; vW = w.xyz; vN = normalize(mat3(modelMatrix)*n);
+  vec4 w = modelMatrix*p; vW = w.xyz; vN = unit(mat3(modelMatrix)*n);
   vC = vec3(1.);
   #ifdef USE_COLOR
   vC = color;
@@ -96,7 +101,7 @@ void main(){
     base = mix(base, base*vec3(1.05,1.02,.9), uPaint*fadeP*smoothstep(.0,.5,wash));
   }
   base *= 1. + uGrain*((step(.5, vnoise(vW.xz*.55))-.5)*.07 + (vnoise(vW.xz*.07)-.5)*.16 + (step(.62, vnoise(vW.xz*2.3+7.))-.3)*.035);
-  vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
+  vec3 n = unit(vN); if(!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vW);
   float nl = dot(n, uLightDir);
   nl = mix(nl, min(nl, -.2), nl > 0. ? sunShadow(nl) : 0.);

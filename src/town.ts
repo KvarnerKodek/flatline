@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { toon, outline, glow, hex } from './toon';
+import { toon, outline, glow, hex, UNIT } from './toon';
 import { Mesher, finish } from './props';
 
 const rng = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -333,10 +333,10 @@ export function lightBeam(length = 400, spread = 0.07, color = 0xffe9a8): THREE.
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
     uniforms: { uCol: { value: hex(color) }, uVis: { value: 1 }, uLen: { value: length } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    vertexShader: `varying float vA; varying vec3 vN, vV; void main(){ vA = position.x; vec4 w = modelMatrix*vec4(position,1.); vN = normalize(mat3(modelMatrix)*normal); vV = normalize(cameraPosition-w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform vec3 uCol; uniform float uVis, uLen; varying float vA; varying vec3 vN, vV; void main(){
+    vertexShader: `${UNIT} varying float vA; varying vec3 vN, vV; void main(){ vA = position.x; vec4 w = modelMatrix*vec4(position,1.); vN = unit(mat3(modelMatrix)*normal); vV = normalize(cameraPosition-w.xyz); gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `${UNIT} uniform vec3 uCol; uniform float uVis, uLen; varying float vA; varying vec3 vN, vV; void main(){
       float along = 1.-smoothstep(0., uLen, vA);
-      float body = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
+      float body = pow(abs(dot(unit(vN), normalize(vV))), 1.6);
       gl_FragColor = vec4(uCol, along*along*body*uVis*.2); }`,
   }));
   m.frustumCulled = false;
