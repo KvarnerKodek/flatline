@@ -9,6 +9,8 @@ vi.hoisted(() => {
 import { figure } from '../src/figure';
 import { G } from '../src/toon';
 
+const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+
 const lowestY = (o: THREE.Object3D) => {
   o.updateMatrixWorld(true);
   let y = Infinity;
@@ -57,6 +59,25 @@ describe('figure rig', () => {
       f.root.updateMatrixWorld(true);
       expect(at(f.handR).distanceTo(right)).toBeLessThan(0.01);
       expect(at(f.handL).distanceTo(left)).toBeLessThan(0.01);
+    }
+  });
+
+  it('lays the palm flat on a surface facing `palm`, touching it with no part of the hand through it', () => {
+    const f = figure({});
+    f.root.position.set(-3, 0, 1);
+    f.root.rotation.y = -0.4;
+    f.root.updateMatrixWorld(true);
+    const v = new THREE.Vector3(), cases: [THREE.Vector3, THREE.Vector3][] = [[V(0.4, 1.5, 0.35), V(-1, 0.1, 0.3)], [V(0.45, 1.2, 0.2), V(0, -1, 0)], [V(0.3, 1.6, 0.4), V(-0.6, 0, -0.8)], [V(0.35, 1.4, 0.3), V(0, 0, -1)]];
+    for (const [l, n] of cases) {
+      const grip = f.root.localToWorld(l), face = n.normalize();
+      f.pose({ gripR: grip, palmR: face, t: 3 });
+      f.root.updateMatrixWorld(true);
+      const off = new THREE.Vector3().setFromMatrixPosition(f.handR.matrixWorld).sub(grip);
+      expect(off.addScaledVector(face, -off.dot(face)).length()).toBeLessThan(0.01);
+      let deepest = -Infinity;
+      f.joints.arms[1].wr.traverse((c) => { const m = c as THREE.Mesh; if (!m.isMesh) return; const p = m.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) deepest = Math.max(deepest, v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).sub(grip).dot(face)); });
+      expect(deepest).toBeLessThan(0);
+      expect(deepest).toBeGreaterThan(-0.005);
     }
   });
 

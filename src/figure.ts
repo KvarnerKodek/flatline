@@ -42,7 +42,9 @@ export interface FigureOpts {
  * - `gripL`/`gripR` put that hand's palm on a world point, solving shoulder and elbow (two-bone IK); this wins over
  *   `arm`/`reach`/`elbow`. `gripMixL`/`gripMixR` ease between the two: 0 keeps the arm's own pose, 1 (the default)
  *   puts the palm on the grip, so a hand can travel to a prop and leave it again without a snap. `curlL`/`curlR`
- *   close the fingers, 0 open to 1 a fist (a grip curls them by default).
+ *   close the fingers, 0 open to 1 a fist (a grip curls them by default). `palmL`/`palmR` (with a grip) turn the palm to
+ *   face that world direction, fingers flat and open, so a hand lies on a flat prop such as a phone's back or a tray
+ *   instead of curling through it.
  * - `bow` leans the upper body forward, `headYaw`/`headPitch` turn the head, `mood` runs from -1, a worried frown
  *   with raised inner brows, to 1, a smile.
  * - `t` is film time for idle life (breathing, weight shift, head drift, blinks, glances); it defaults to the
@@ -51,7 +53,7 @@ export interface FigureOpts {
  */
 export interface FigurePose {
   walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number; mood?: number;
-  elbowL?: number; elbowR?: number; gripL?: THREE.Vector3 | null; gripR?: THREE.Vector3 | null; gripMixL?: number; gripMixR?: number; curlL?: number; curlR?: number; t?: number; idle?: number;
+  elbowL?: number; elbowR?: number; gripL?: THREE.Vector3 | null; gripR?: THREE.Vector3 | null; gripMixL?: number; gripMixR?: number; palmL?: THREE.Vector3 | null; palmR?: THREE.Vector3 | null; curlL?: number; curlR?: number; t?: number; idle?: number;
 }
 
 /** `hand` is the right palm (kept for older films); `handL`/`handR` are the palms, where props are attached. */
@@ -262,11 +264,27 @@ export function figure(o: FigureOpts = {}): Figure {
   const inv = new THREE.Matrix4(), basis = new THREE.Matrix4(), d = new THREE.Vector3(), perp = new THREE.Vector3(), upper = new THREE.Vector3();
   const elbowAt = new THREE.Vector3(), fd = new THREE.Vector3(), X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), pole = new THREE.Vector3();
   const WRIST = -Math.atan2(0.035, PALM), REACH = ARM_F + Math.hypot(0.035, PALM);
-  /** Two-bone IK in the spine's space: shoulder and elbow turn so arm `a`'s palm lands on world point `world`. */
-  const reachTo = (a: Arm, world: THREE.Vector3) => {
+  const qHand = new THREE.Quaternion(), qOwn = new THREE.Quaternion(), wristAt = new THREE.Vector3();
+  /**
+   * Two-bone IK in the spine's space: shoulder and elbow turn so arm `a`'s palm lands on world point `world`. With
+   * `face`, the palm also turns to face that world direction, fingers flat along the surface and pointing up and away
+   * from the shoulder, eased in by `k` from the hand's own orientation, and the IK lands the wrist where that palm needs it.
+   */
+  const reachTo = (a: Arm, world: THREE.Vector3, face?: THREE.Vector3, k = 1) => {
     spine.updateWorldMatrix(true, false);
-    d.copy(world).applyMatrix4(inv.copy(spine.matrixWorld).invert()).sub(a.sh.position);
-    const u = ARM_U, f = REACH, L = Math.min(Math.max(d.length(), Math.abs(u - f) + 1e-3), (u + f) * 0.9995);
+    wristAt.copy(world);
+    if (face) {
+      if (k < 1) { a.wr.updateWorldMatrix(true, false); a.wr.getWorldQuaternion(qOwn); }
+      X.copy(face).normalize();
+      Y.copy(world).sub(a.sh.getWorldPosition(Z)).normalize();
+      Y.y += 0.8;
+      Y.addScaledVector(X, -Y.dot(X)).negate().normalize();
+      qHand.setFromRotationMatrix(basis.makeBasis(X, Y, Z.crossVectors(X, Y)));
+      if (k < 1) qHand.slerpQuaternions(qOwn, qHand, k);
+      wristAt.sub(Z.copy(a.palm.position).setX(0.024).applyQuaternion(qHand));
+    }
+    d.copy(wristAt).applyMatrix4(inv.copy(spine.matrixWorld).invert()).sub(a.sh.position);
+    const u = ARM_U, f = face ? ARM_F : REACH, L = Math.min(Math.max(d.length(), Math.abs(u - f) + 1e-3), (u + f) * 0.9995);
     d.setLength(L);
     const dn = d.clone().normalize(), alpha = Math.acos(Math.min(1, Math.max(-1, (u * u + L * L - f * f) / (2 * u * L))));
     pole.set(-0.45, -1, a.s * 0.55);
@@ -284,6 +302,7 @@ export function figure(o: FigureOpts = {}): Figure {
     a.sh.quaternion.setFromRotationMatrix(basis.makeBasis(X, Y, Z));
     a.el.rotation.set(0, 0, Math.acos(Math.min(1, Math.max(-1, upper.dot(fd)))));
     a.wr.rotation.set(0, 0, WRIST);
+    if (face) { a.el.updateWorldMatrix(true, false); a.wr.quaternion.copy(a.el.getWorldQuaternion(qOwn).invert().multiply(qHand)); }
   };
 
   let carried: THREE.Object3D | null = null, carryHalf = 0.3;
@@ -361,17 +380,18 @@ export function figure(o: FigureOpts = {}): Figure {
         const R = i === 1, grip = (R ? p.gripR : p.gripL) ?? (carrying ? gripAt[i] : undefined);
         const armA = (R ? p.armR : p.armL) ?? 0, reach = (R ? p.reachR : p.reachL) ?? 0, holding = Math.min(1, Math.max(0, (armA - 0.6) / 0.7)), counter = -Math.sin(ph(i)) * st * 0.8 * (1 - 0.85 * holding);
         const mixK = grip ? Math.min(1, Math.max(0, (R ? p.gripMixR : p.gripMixL) ?? 1)) : 0;
-        const curl = (R ? p.curlR : p.curlL) ?? (heldBy[i] ? 0.7 : 0.25 + 0.05 * breath * life + 0.6 * mixK);
+        const face = grip ? (R ? p.palmR : p.palmL) ?? undefined : undefined;
+        const curl = (R ? p.curlR : p.curlL) ?? (heldBy[i] ? 0.7 : 0.25 + 0.05 * breath * life + (face ? -0.15 : 0.6) * mixK);
         a.fingers.rotation.set(0, 0, curl * 0.85);
         a.tip.rotation.set(0, 0, curl * 1.05);
-        a.thumb.rotation.set(a.s * 0.35, 0, 0.45 + curl * 0.6);
-        if (mixK >= 1) { reachTo(a, grip!); return; }
+        a.thumb.rotation.set(a.s * 0.35, 0, (face ? -0.1 : 0.45) + curl * 0.6);
+        if (mixK >= 1) { reachTo(a, grip!, face); return; }
         a.sh.rotation.set(R ? reach : -reach, 0, armA + counter + breath * 0.02 * life);
         a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA));
         const elbow = (R ? p.elbowR : p.elbowL) ?? (0.18 + 0.32 * Math.min(1, Math.max(0, armA) / 2.2) + Math.max(0, Math.sin(ph(i))) * st * 0.5 + 0.03 * Math.sin(t * 0.9 + seed + i) * life);
         a.el.rotation.set(0, 0, elbow);
         a.wr.rotation.set(0, 0, -0.1 - elbow * 0.15);
-        if (mixK > 0) { a.palm.updateWorldMatrix(true, false); reachTo(a, mixAt.setFromMatrixPosition(a.palm.matrixWorld).lerp(grip!, mixK)); }
+        if (mixK > 0) { a.palm.updateWorldMatrix(true, false); reachTo(a, mixAt.setFromMatrixPosition(a.palm.matrixWorld).lerp(grip!, mixK), face, mixK); }
       });
 
       // Head: turns and nods, a slow drift and a walk-stabilised gaze.
