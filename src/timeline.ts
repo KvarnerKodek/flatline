@@ -5,6 +5,7 @@ import type { Grade } from './post';
 import type { Look } from './look';
 import type { Score } from './score';
 import type { Sound } from './soundtrack';
+import type { QaSource } from './qa/registry';
 
 export type { Caption, Chapter, TrackSpec };
 
@@ -78,6 +79,8 @@ export interface Film<W> {
   endCard?: { html: string; at: number };
   /** Optional extra drawing straight onto the canvas after post-processing, for inset views. */
   afterPost?(world: W, t: number, ctx: AfterPost): void;
+  /** What `flatline-qa` should check beyond objects tagged with `tagQa`: actors, obstacles, HUD boxes, deliberate cuts, owners. */
+  qa?(world: W): QaSource;
 }
 
 export interface AfterPost {

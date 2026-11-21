@@ -32,6 +32,7 @@ export function shotFade(a: ShotAt): number {
 
 /** Runs the shot that owns `t`, writes the camera and returns the shot with its fade. */
 export function cutTrack(shots: Shot[], duration: number) {
+  if (!shots.length) throw new Error('cutTrack needs at least one shot starting at 0');
   return (t: number, c: CameraShot): ShotAt & { fade: number } => {
     const a = shotAt(shots, duration, t);
     a.shot.cam(c, a.u, a.s, t);

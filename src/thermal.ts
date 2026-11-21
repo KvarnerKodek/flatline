@@ -15,6 +15,7 @@ const HEAT = new THREE.ShaderMaterial({
 
 export class Thermal {
   cam = new THREE.PerspectiveCamera(8, 1.6, 0.5, 4000);
+  private clear = new THREE.Color();
 
   constructor(private scene: THREE.Scene) {
     this.cam.layers.set(1);
@@ -49,7 +50,7 @@ export class Thermal {
     c.updateProjectionMatrix();
     c.updateMatrixWorld();
     const prevAuto = r.autoClear;
-    const prevColor = new THREE.Color();
+    const prevColor = this.clear;
     r.getClearColor(prevColor);
     const prevAlpha = r.getClearAlpha();
     const scene = this.scene;
