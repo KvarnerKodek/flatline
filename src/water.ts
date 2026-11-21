@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { G, COMMON } from './toon';
 import type { Mood } from './mood';
+import { SOFT, SOFT_GLSL, softParticle } from './softdepth';
 
 export const WAVES = [
   { dx: 0.92, dz: 0.38, a: 0.34, l: 38 },
@@ -73,7 +74,7 @@ export function makeWater(): THREE.Mesh {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
-    uniforms: { ...G, ...U },
+    uniforms: { ...G, ...U, ...SOFT },
     vertexShader: /* glsl */ `
       ${COMMON}
       varying vec3 vW; varying float vH;
@@ -89,6 +90,7 @@ export function makeWater(): THREE.Mesh {
       }`,
     fragmentShader: /* glsl */ `
       ${COMMON}
+      ${SOFT_GLSL}
       varying vec3 vW; varying float vH;
       uniform vec3 uDeep,uShallow,uHorizon,uZenith,uSky,uSunCol;
       uniform vec4 uWakes[${MAX_WAKES}]; uniform float uWakeS[${MAX_WAKES}]; uniform int uWakeN; uniform vec3 uHole;
@@ -105,7 +107,7 @@ export function makeWater(): THREE.Mesh {
         vec3 n = normalize(vec3(-dd.x-rn.x, 1., -dd.y-rn.y));
         vec3 v = normalize(cameraPosition - vW);
         float nv = max(dot(n,v),0.);
-        float fres = pow(1.-nv, 4.);
+        float fres = pow(max(1.-nv,0.), 4.);
         float skyMix = clamp(fres*1.35, 0., 1.);
         vec3 base = mix(uDeep, uShallow, smoothstep(-.35,.45,vH)*.4 + .4 + .1*rp);
         vec3 refl = mix(uSky*.9, uHorizon, smoothstep(.0,.9,fres));
@@ -141,13 +143,17 @@ export function makeWater(): THREE.Mesh {
             foam += clamp(kel*.9*smoothstep(.3,.5,n1) + vee*.55*smoothstep(.25,.55,vnoise(vec2(back*.3,side*.9))),0.,1.) * clamp(B.w*.5,.25,1.);
           }
         }
+        float gap = softGap();
+        col = mix(col, uShallow*.95, (1.-smoothstep(0.,4.,gap))*.7);
+        foam = max(foam, .4*smoothstep(0.,.6,gap)*(1.-smoothstep(.6,2.2,gap))*(.55+.45*vnoise(p*1.7+uTime*.4)));
         col = mix(col, vec3(.92,.97,1.)*(.55+.45*(1.-uNight*.5)), clamp(foam,0.,1.)*.85);
         col = applyFog(col, dist);
         gl_FragColor = vec4(col, 1.);
       }`,
   }));
   m.frustumCulled = false;
-  return m;
+  m.userData.noSoftDepth = true;
+  return softParticle(m);
 }
 
 export function updateWater(m: Mood) {

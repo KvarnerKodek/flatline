@@ -23,10 +23,12 @@ export const flattenSites = (h: HeightFn, sites: Site[]): HeightFn => (x, z) =>
 /** True within `pad` radii of a site (1 is its edge). */
 export const onSite = (sites: Site[], x: number, z: number, pad = 1.25) => sites.some((s) => ellipse(x, z, s) < pad);
 
-/** Where things stand: the top of a site (plus `lift`), or the ground. */
+/** Where things stand: the top of a site (plus `lift`), easing down to the ground over the site's outer 30%. */
 export const standHeight = (h: HeightFn, sites: Site[], x: number, z: number, lift = 0.4) => {
-  const s = sites.find((q) => ellipse(x, z, q) < 0.7);
-  return s ? s.y + lift : h(x, z);
+  const s = sites.find((q) => ellipse(x, z, q) < 1);
+  if (!s) return h(x, z);
+  const top = s.y + lift;
+  return top + (h(x, z) - top) * ss(0.7, 1, ellipse(x, z, s));
 };
 
 /** One broad swell of ground: `amp` metres at wavelength `scale`, `calm` (0 to 1+) keeps the valley floor quieter than its walls. */
@@ -160,7 +162,8 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
         vec3 n = normalize(vN);
         float n1 = fbm(p*.009), n2 = fbm(p*.04+7.), n3 = fbm(p*.22+3.);
         vec3 g1 = uGrass[0], g2 = uGrass[1], g3 = uGrass[2], g4 = uGrass[3];
-        float detail = 1. - smoothstep(60.,260.,dist);
+        float mpp = length(fwidth(p)), res = 1. - smoothstep(.7,2.5,mpp);
+        float detail = (1. - smoothstep(60.,260.,dist))*res;
         vec3 base = mix(g2, g1, aa(n1,.46)); base = mix(base, g3, aa(n1,.63)*.8); base = mix(base, g4, aa(n2,.72)*.5*detail);
         base = mix(base, uDry, smoothstep(.55,.9,fbm(p*.0035+19.))*.25);
         vec2 wp = p + vec2(fbm(p*.004)*90., fbm(p*.004+5.)*90.); vec2 cell = floor(wp/uCell); float hid = hash21(cell), hid2 = hash21(cell+7.);
@@ -177,14 +180,16 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
         float slope = 1.-n.y;
         base = mix(base, mix(uRock[0], uRock[1], n2), smoothstep(.2,.42,slope + (n3-.5)*.08*detail));
         float far = smoothstep(150.,900.,dist); base = mix(base, mix(g1,g2,.5)*vec3(.9,1.,1.05), far*.5); base = mix(base, uHaze, smoothstep(450.,1700.,dist)*.55);
+        base = mix(base, vec3(dot(base, vec3(.3,.59,.11)))*vec3(.9,.98,1.1), smoothstep(250.,1400.,dist)*.5);
         vec2 fc2 = floor(p*.55);
-        float fl = uFlowerOn*step(.989, hash21(fc2))*(1.-smoothstep(18.,80.,dist))*(1.-smoothstep(.12,.2,slope))*(1.-smoothstep(.16,.26,length(fract(p*.55)-.5)));
+        float fl = uFlowerOn*step(.989, hash21(fc2))*(1.-smoothstep(18.,80.,dist))*res*(1.-smoothstep(.12,.2,slope))*(1.-smoothstep(.16,.26,length(fract(p*.55)-.5)));
         base = mix(base, mix(uFlowers[0], uFlowers[1], step(.5,hash21(fc2+3.))), fl*.9);
         float pd = 1e5; for (int i=0;i<${MAX_PATH_POINTS - 1};i++){ vec4 a = uPath[i]; if (a.z > .5) pd = min(pd, segDist(p, a.xy, uPath[i+1].xy)); }
         float road = 1.-smoothstep(uPathW,uPathW*1.44,pd), edge = smoothstep(uPathW*.8,uPathW,pd)*(1.-smoothstep(uPathW*1.04,uPathW*1.44,pd));
         vec3 pc = uPathC*mix(1., .94, n3); base = mix(base, pc*.92, edge*.6); base = mix(base, pc, road*(1.-smoothstep(.15,.3,slope)));
+        base *= 1. + (fbm(p*vec2(.03,.018) + vec2(-uTime*.13, uTime*.05)) - .5)*.24*(1.-smoothstep(40.,380.,dist))*(1.-road)*(1.-farm*.7)*(1.-smoothstep(.1,.3,slope));
         float cs = smoothstep(.52,.74, fbm(p*.0021 + vec2(uTime*.012, uTime*.004) + 31.)); base *= (1. - uCloud*cs*(1.-uNight)*smoothstep(80.,500.,dist)) * (1. + .05*(1.-cs));
-        float pm = 1.-smoothstep(150.,520.,dist), pw = 1.-smoothstep(500.,1500.,dist);
+        float pm = (1.-smoothstep(150.,520.,dist))*res, pw = 1.-smoothstep(500.,1500.,dist);
         float brush = fbm(vec2(dot(p, vec2(.8,.6))*.16, dot(p, vec2(-.6,.8))*.035) + 11.);
         float dab = fbm(p*vec2(.5,.16) + 23.);
         base *= mix(vec3(.93,.98,1.05), vec3(1.07,1.03,.9), fbm(p*.0028+4.)) * (1. + (brush-.5)*.3*pm + (dab-.5)*.16*pm);
@@ -197,7 +202,7 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
         vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
         col += uShadow*.2*(smoothstep(-.1,.0,nl)-smoothstep(.0,.1,nl))*base;
         col *= mix(vec3(1.), vec3(.66,.7,.9), sh);
-        float rim = pow(1.-max(dot(n, normalize(cameraPosition - vW)), 0.), 3.);
+        float rim = pow(max(1.-dot(n, normalize(cameraPosition - vW)), 0.), 3.);
         col += vec3(1.,.88,.58)*rim*.2*smoothstep(-.1,.5,nl)*(1.-smoothstep(600.,1800.,dist));
         gl_FragColor = vec4(applyFog(col, dist), 1.);
       }`,
@@ -205,5 +210,6 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
   const mesh = new THREE.Mesh(g, mat);
   mesh.frustumCulled = false;
   mesh.userData.noShadow = true;
+  mesh.userData.noEdge = true;
   return { mesh, height, stand: (x, z) => standHeight(height, sites, x, z), onSite: (x, z, pad) => onSite(sites, x, z, pad) };
 }

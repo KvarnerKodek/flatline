@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { COMMON, G } from './toon';
+import { SOFT, SOFT_GLSL, softParticle } from './softdepth';
 
 /**
  * A cloud of glowing points a film places itself: fireflies, sparks, coins, lanterns, snow. The film writes
@@ -25,7 +26,7 @@ export class Motes {
     g.setAttribute('aCol', new THREE.BufferAttribute(this.col, 4));
     g.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1));
     this.points = new THREE.Points(g, new THREE.ShaderMaterial({
-      uniforms: { uRes: G.uRes, uDisc: { value: disc }, uMinPx: { value: minPx }, uMaxPx: { value: maxPx } },
+      uniforms: { ...SOFT, uRes: G.uRes, uDisc: { value: disc }, uMinPx: { value: minPx }, uMaxPx: { value: maxPx } },
       transparent: true, depthWrite: false, premultipliedAlpha: true,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       vertexShader: /* glsl */ `
@@ -39,6 +40,7 @@ export class Motes {
           gl_PointSize = clamp(px, uMinPx*k, uMaxPx*k);
         }`,
       fragmentShader: /* glsl */ `
+        ${SOFT_GLSL}
         uniform float uDisc; varying vec4 vC;
         void main(){
           float d = length(gl_PointCoord-.5)*2.;
@@ -49,11 +51,13 @@ export class Motes {
           vec3 coin = vC.rgb*(.9 - .32*smoothstep(.44,.5,d) - .3*ring) + vec3(.16)*smoothstep(.2,.0,length(gl_PointCoord-vec2(.4,.38))*2.);
           float halo = exp(-d*d*2.6)*.42*edge;
           vec3 rgb = mix(vC.rgb*soft*edge, coin*face + vC.rgb*halo*(1.-face), uDisc);
-          gl_FragColor = vec4(rgb*vC.a, face*vC.a*uDisc);
+          float sf = softFade(.6);
+          gl_FragColor = vec4(rgb*vC.a*sf, face*vC.a*uDisc*sf);
         }`,
     }));
     this.points.frustumCulled = false;
     this.points.renderOrder = 8;
+    softParticle(this.points);
   }
 
   begin() { this.n = 0; }
@@ -101,7 +105,7 @@ export class Rain {
           vec3 fall = normalize(vec3(uSlant.x, -1., uSlant.y));
           vec3 side = normalize(cross(fall, cameraPosition-c));
           vec3 p = c + fall*position.y*(1.1+aOff.w*1.3) + side*position.x*.028;
-          vA = .5+.5*aOff.w;
+          vA = (.5+.5*aOff.w);
           gl_Position = projectionMatrix*viewMatrix*vec4(p,1.);
         }`,
       fragmentShader: `uniform float uVis; varying float vA; void main(){ gl_FragColor = vec4(.78,.86,1., vA*uVis*.42); }`,
@@ -172,18 +176,19 @@ export class Puffs {
     this.geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     this.geo.setAttribute('iSA', new THREE.InstancedBufferAttribute(this.sa, 3).setUsage(THREE.DynamicDrawUsage));
     const mesh = new THREE.Mesh(this.geo, new THREE.ShaderMaterial({
-      uniforms: { ...G, uCol: { value: new THREE.Color(color) }, uVeil: { value: 0 } },
+      uniforms: { ...G, ...SOFT, uCol: { value: new THREE.Color(color) }, uVeil: { value: 0 } },
       transparent: true, depthWrite: false,
       vertexShader: /* glsl */ `
-        attribute vec3 iPos, iSA; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
+        attribute vec3 iPos, iSA; varying vec2 vP; varying vec3 vW; varying float vA, vSeed, vS;
         void main(){
-          vP = position.xy; vA = iSA.y; vSeed = iSA.z; vW = iPos;
+          vP = position.xy; vA = iSA.y; vS = iSA.x; vSeed = iSA.z; vW = iPos;
           vec3 r = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), u = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
           gl_Position = projectionMatrix*viewMatrix*vec4(iPos + (r*position.x + u*position.y)*iSA.x*1.25, 1.);
         }`,
       fragmentShader: /* glsl */ `
         ${COMMON}
-        uniform vec3 uCol; uniform float uVeil; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
+        ${SOFT_GLSL}
+        uniform vec3 uCol; uniform float uVeil; varying vec2 vP; varying vec3 vW; varying float vA, vSeed, vS;
         void main(){
           float an = atan(vP.y, vP.x), s = vSeed*6.283;
           float e = length(vP)/(.8 + .07*sin(an*5. + s) + .05*sin(an*9. - s*2.) + .04*(vnoise(vP*3. + s) - .5));
@@ -192,12 +197,13 @@ export class Puffs {
           float nl = dot(n, l) + (vnoise(vP*2.5 - s) - .5)*.3;
           vec3 lit = uCol*(.6 + .5*uLightCol), shade = uCol*mix(uShadow, vec3(1.), .62)*(.62 + .3*uLightCol);
           vec3 col = mix(shade, lit, smoothstep(-.3, -.05, nl)) * (1. - .25*uNight) * (1. - .14*smoothstep(.7, .9, e));
-          float a = vA*(1. - smoothstep(.82, 1., e));
+          float a = vA*(1. - smoothstep(.82, 1., e))*smoothstep(.3, 1.4, length(cameraPosition - vW)/vS)*softFade(vS*.5);
           gl_FragColor = uVeil > .5 ? vec4(vec3(-(viewMatrix*vec4(vW, 1.)).z), a) : vec4(applyFog(col, length(cameraPosition - vW)), a);
         }`,
     }));
     mesh.frustumCulled = false;
     mesh.renderOrder = 7;
+    softParticle(mesh);
     this.group.add(mesh);
     this.group.visible = false;
   }

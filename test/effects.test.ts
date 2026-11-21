@@ -116,3 +116,48 @@ describe('fireworks', () => {
     expect(g.geometry.drawRange.count).toBeGreaterThan(20);
   });
 });
+
+describe('smoke gusts', () => {
+  it('stay within 0.6 to 1.4 and move the lean over time', async () => {
+    const { gust } = await import('../src/smoke');
+    const g = Array.from({ length: 400 }, (_, i) => gust(i * 0.5));
+    expect(Math.min(...g)).toBeGreaterThanOrEqual(0.6);
+    expect(Math.max(...g)).toBeLessThanOrEqual(1.4);
+    expect(Math.max(...g) - Math.min(...g)).toBeGreaterThan(0.4);
+    const a = puffAt(10, 0, 0, smokeOpts), b = puffAt(10 + 2 * Math.PI / 0.55 / 2, 0, 0, smokeOpts);
+    expect(a.x).not.toBe(b.x);
+  });
+});
+
+describe('soft clouds', () => {
+  it('carry a 0 to 1 height attribute for self-shading and stay within a triangle budget', async () => {
+    const { makeSoftClouds } = await import('../src/softclouds');
+    const c = makeSoftClouds({ count: 4 });
+    const geos = c.group.children.map((m) => (m as THREE.Mesh).geometry);
+    for (const g of geos) {
+      const h = g.getAttribute('aH').array as Float32Array;
+      expect(Math.min(...h)).toBeCloseTo(0, 5);
+      expect(Math.max(...h)).toBeCloseTo(1, 5);
+      const c = g.getAttribute('aC').array as Float32Array;
+      expect(Math.min(...c)).toBe(0);
+      expect(Math.max(...c)).toBeGreaterThan(0.5);
+      expect(c.filter((x) => x === 0).length).toBeGreaterThan(c.length * 0.1);
+    }
+    const tris = geos.reduce((n, g) => n + g.index!.count / 3, 0) / geos.length;
+    console.log('tris per cloud', tris);
+    expect(tris).toBeLessThan(9000);
+  });
+});
+
+describe('fx opacity', () => {
+  it('is zero at both ends, rises smoothly and never grows after its peak', async () => {
+    const { fxOpacity } = await import('../src/fx');
+    const o = Array.from({ length: 101 }, (_, i) => fxOpacity(i / 100));
+    expect(o[0]).toBe(0);
+    expect(o[100]).toBe(0);
+    const peak = o.indexOf(Math.max(...o));
+    expect(peak).toBeLessThan(30);
+    expect(o.slice(peak).every((v, i, a) => !i || v <= a[i - 1] + 1e-12)).toBe(true);
+    expect(Math.max(...o.slice(1).map((v, i) => Math.abs(v - o[i])))).toBeLessThan(0.1);
+  });
+});
