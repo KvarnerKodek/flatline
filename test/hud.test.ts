@@ -20,7 +20,7 @@ describe('tag stacking', () => {
   });
 });
 
-import { avoidRects, captionPose, leaderSegment } from '../src/hud';
+import { avoidRects, captionPose, chapterLabelLeft, leaderSegment } from '../src/hud';
 
 describe('caption pose', () => {
   const c = { t0: 10, t1: 20, k: '', h: '' };
@@ -79,4 +79,11 @@ describe('tag clamping', () => {
     expect(clampTag(-20, 40, 1000, 116)).toBe(116);
     expect(clampTag(500, 40, 1000)).toBe(500);
   });
+});
+
+describe('chapter label', () => {
+  it('starts at its tick', () => expect(chapterLabelLeft(120, 60, 800)).toBe(120));
+  it('stays inside the bar at the left', () => expect(chapterLabelLeft(-10, 60, 800)).toBe(0));
+  it('stays inside the bar at the right', () => expect(chapterLabelLeft(790, 60, 800)).toBe(740));
+  it('never goes negative when the label is wider than the bar', () => expect(chapterLabelLeft(10, 900, 800)).toBe(0));
 });

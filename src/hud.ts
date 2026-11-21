@@ -57,6 +57,9 @@ export function avoidRects(regions: Rect[], x: number, y: number, w: number, h: 
 /** Keeps a tag of height `h` between `min` and the bottom of a viewport `vh` tall, 8px in. */
 export const clampTag = (y: number, h: number, vh: number, min = 8) => Math.max(min, Math.min(y, vh - h - 8));
 
+/** Left edge of a seekbar chapter label: starts at its tick and stays inside the bar. */
+export const chapterLabelLeft = (tickPx: number, labelW: number, scrubW: number) => Math.max(0, Math.min(tickPx, scrubW - labelW));
+
 export interface TrackSpec {
   id: string;
   pos: THREE.Vector3;
@@ -106,12 +109,13 @@ export class Hud {
     const labels = [...scrub.querySelectorAll<HTMLElement>('.tl')];
     const declutter = () => {
       let edge = -Infinity;
-      for (const l of labels) {
+      labels.forEach((l, i) => {
         l.style.visibility = 'visible';
+        l.style.left = chapterLabelLeft((chapters[i].t / duration) * scrub.clientWidth, l.offsetWidth, scrub.clientWidth) + 'px';
         const r = l.getBoundingClientRect();
         if (r.left < edge + 8) l.style.visibility = 'hidden';
         else edge = r.right;
-      }
+      });
     };
     addEventListener('resize', declutter);
     requestAnimationFrame(declutter);
