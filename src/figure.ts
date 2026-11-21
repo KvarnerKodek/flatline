@@ -201,14 +201,14 @@ export function figure(o: FigureOpts = {}): Figure {
   const head = new THREE.Group();
   head.position.y = 0.2;
   neck.add(head);
-  part(head, new THREE.SphereGeometry(0.23, 18, 14).scale(1, 0.98, 1), skin);
+  part(head, new THREE.SphereGeometry(0.23, 28, 20).scale(1, 0.98, 1), skin);
   part(head, new THREE.SphereGeometry(0.05, 10, 8).scale(1, 0.75, 1.5), skin, 0.15, -0.11, 0);
   const hair = o.hair ?? 0x3b2a20;
-  part(head, new THREE.SphereGeometry(0.247, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.56).rotateZ(0.5), hair, -0.012, 0.012, 0);
-  part(head, new THREE.SphereGeometry(0.243, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.24).rotateZ(-0.3).rotateX(0.22), hair);
+  part(head, new THREE.SphereGeometry(0.247, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.56).rotateZ(0.5), hair, -0.012, 0.012, 0);
+  part(head, new THREE.SphereGeometry(0.243, 28, 8, 0, Math.PI * 2, 0, Math.PI * 0.24).rotateZ(-0.3).rotateX(0.22), hair);
   for (const s of [-1, 1]) {
     part(head, new THREE.SphereGeometry(0.045, 10, 8).scale(0.5, 1, 0.8), skin, 0.0, 0.0, s * 0.225);
-    part(head, new THREE.SphereGeometry(0.11, 12, 8).scale(0.9, 1.05, 0.55), hair, -0.03, 0.04, s * 0.19);
+    part(head, new THREE.SphereGeometry(0.11, 18, 14).scale(0.9, 1.05, 0.55), hair, -0.03, 0.04, s * 0.19);
   }
   if (o.hairStyle === 'bun') part(head, new THREE.SphereGeometry(0.1, 12, 10), hair, -0.2, 0.12, 0);
   const braids: THREE.Group[] = [];
@@ -241,9 +241,9 @@ export function figure(o: FigureOpts = {}): Figure {
     brows.push(face(new THREE.CapsuleGeometry(0.008, 0.044, 2, 6).rotateX(Math.PI / 2), hair, 0.216, 0.072, s * 0.084));
     face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
   }
-  face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.2, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.232, -0.028, 0);
-  const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.216, -0.095, 0);
-  const grin = face(new THREE.SphereGeometry(0.03, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.3, 0.62, 1), 0x5a1a16, 0.212, -0.089, 0);
+  face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.2, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.226, -0.028, 0);
+  const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.21, -0.095, 0);
+  const grin = face(new THREE.SphereGeometry(0.03, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.3, 0.62, 1), 0x5a1a16, 0.206, -0.089, 0);
   let feather: THREE.Group | undefined;
   if (o.hat !== undefined && o.tyrolean) {
     part(head, new THREE.CylinderGeometry(0.33, 0.34, 0.03, 20).rotateZ(-0.06), o.hat, 0, 0.17, 0);
