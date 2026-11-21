@@ -9,9 +9,12 @@ html,body{height:100%;background:var(--ink);color:var(--fg);overflow:hidden;font
 .brk i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
 .brk i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
 .brk i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
-.tag{position:absolute;left:0;top:0;font:500 11px/1.35 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--c,#ff6b5e);background:rgba(5,13,20,.62);backdrop-filter:blur(4px);padding:5px 8px;border-left:2px solid var(--c,#ff6b5e);white-space:nowrap;will-change:transform,opacity}
-.tag b{display:block;color:#fff;font-weight:600;font-size:12px}
-.lead{position:absolute;left:0;top:0;height:1px;background:var(--c,#8fe3c6);transform-origin:0 0;opacity:.8}
+.tag{position:absolute;left:0;top:0;font:500 12px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;font-variant-numeric:tabular-nums;color:var(--c,#ff6b5e);background:rgba(5,13,20,.74);backdrop-filter:blur(10px) saturate(1.2);padding:6px 10px 6px 14px;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.28);white-space:nowrap;will-change:transform,opacity;text-rendering:optimizeLegibility}
+#hud .tag{border-left-width:0}
+.tag::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c,#ff6b5e)}
+.tag b{display:block;color:#fff;font-weight:600;font-size:13px}
+.lead{position:absolute;left:0;top:0;height:1px;background:var(--c,#8fe3c6);box-shadow:0 0 0 .5px rgba(0,0,0,.25);transform-origin:0 50%;opacity:.8}
+.lead::before{content:"";position:absolute;left:-2px;top:-2px;width:5px;height:5px;border-radius:50%;background:var(--c,#8fe3c6)}
 .cap{position:absolute;left:clamp(20px,5vw,64px);bottom:clamp(64px,12vh,120px);max-width:min(760px,86vw)}
 .cap .k{font:500 11px var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--mint);margin-bottom:12px}
 .cap h2{font:italic 400 clamp(1.9rem,4.8vw,3.6rem)/1.06 var(--serif);letter-spacing:-.02em;text-shadow:0 2px 24px rgba(0,0,0,.55)}
@@ -21,23 +24,22 @@ html,body{height:100%;background:var(--ink);color:var(--fg);overflow:hidden;font
 .chap b{color:var(--mint);font-weight:500}
 .bar{position:absolute;left:0;right:0;bottom:0;padding:0 clamp(16px,4vw,48px) max(18px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:16px;pointer-events:auto;transition:opacity .4s}
 .bar.idle{opacity:0}
-.bar button{all:unset;cursor:pointer;font:500 11px var(--mono);letter-spacing:.2em;text-transform:uppercase;padding:8px 12px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:var(--fg);background:rgba(5,13,20,.5);backdrop-filter:blur(6px)}
-.bar button:hover,.bar button:focus-visible{border-color:var(--mint);color:var(--mint)}
+.bar button{all:unset;cursor:pointer;font:500 11px var(--mono);letter-spacing:.2em;text-transform:uppercase;padding:8px 14px;border-radius:999px;color:var(--fg);background:rgba(5,13,20,.55);backdrop-filter:blur(10px);box-shadow:0 0 0 1px rgba(255,255,255,.16),0 4px 14px rgba(0,0,0,.25);transition:color .15s,box-shadow .15s}
+.bar button:hover,.bar button:focus-visible{box-shadow:0 0 0 1px var(--mint),0 4px 14px rgba(0,0,0,.25);color:var(--mint)}
 .scrub{position:relative;flex:1;height:26px;cursor:pointer;touch-action:none}
 .scrub::before{content:"";position:absolute;left:0;right:0;top:12px;height:2px;background:rgba(255,255,255,.22)}
 .scrub .fill{position:absolute;left:0;top:12px;height:2px;background:var(--mint)}
 .scrub .tick{position:absolute;top:8px;width:2px;height:10px;background:rgba(255,255,255,.5)}
-.scrub .tl{position:absolute;top:-8px;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 0 6px rgba(2,10,20,.85),0 1px 2px rgba(2,10,20,.8);transform:translateX(-50%);white-space:nowrap}
+.scrub .tl{position:absolute;top:-8px;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 0 6px rgba(2,10,20,.85),0 1px 2px rgba(2,10,20,.8);padding-left:4px;white-space:nowrap}
 .fallback{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:linear-gradient(180deg,#050d14,#12485c)}
 .fallback h1{font:300 clamp(2.4rem,9vw,6rem)/1 system-ui;letter-spacing:-.03em}
 @media (prefers-reduced-motion:reduce){.cap,.legend,.bar{transition:none}}
 
-.pip{position:absolute;border:1px solid rgba(143,227,198,.7);box-shadow:0 0 0 1px rgba(5,13,20,.6),0 10px 40px rgba(0,0,0,.45);overflow:hidden;background:repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,transparent 1px 3px)}
+.pip{position:absolute;border-radius:6px;box-shadow:0 0 0 1px rgba(143,227,198,.55),0 2px 6px rgba(0,0,0,.3),0 14px 40px rgba(0,0,0,.4);overflow:hidden;background:repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,transparent 1px 3px)}
 .pip span,.pip em{position:absolute;font:500 10px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--mint);background:rgba(5,13,20,.6);padding:3px 7px}
 .pip span{left:0;top:0}.pip em{right:0;bottom:0;font-style:normal;color:#d6e4ea}
 .pip::before,.pip::after{content:"";position:absolute;width:12px;height:12px;border:2px solid var(--mint)}
 .pip::before{left:6px;bottom:6px;border-right:0;border-top:0}.pip::after{right:6px;top:6px;border-left:0;border-bottom:0}
-.tag{font-size:12px}
 
 @media (max-width:600px){.pip em{display:none}}
 
@@ -57,7 +59,7 @@ body.letterbox{--bar:max(0px,calc((100vh - 100vw/var(--lb))/2))}
 body.letterbox::before,body.letterbox::after{content:"";position:fixed;left:0;right:0;height:var(--bar);background:#000;z-index:3;pointer-events:none}
 body.letterbox::before{top:0}body.letterbox::after{bottom:0}
 body.letterbox .cap:not(.title){bottom:calc(var(--bar) + clamp(28px,6vh,64px))}
-@media (max-width:800px),(max-height:420px){.cap:not(.title){max-width:58vw}.cap:not(.title) .k{font-size:9px;margin-bottom:6px;letter-spacing:.2em}.cap:not(.title) h2{font-size:clamp(14px,3.4vw,22px)}.cap:not(.title) p{font-size:11px;margin-top:4px}.tag{font-size:10px;padding:4px 7px}.tag b{font-size:11px}.chap{font-size:10px}}
+@media (max-width:800px),(max-height:420px){.cap:not(.title){max-width:58vw}.cap:not(.title) .k{font-size:9px;margin-bottom:6px;letter-spacing:.2em}.cap:not(.title) h2{font-size:clamp(14px,3.4vw,22px)}.cap:not(.title) p{font-size:11px;margin-top:4px}.tag{font-size:10px;padding:4px 8px 4px 11px}.tag b{font-size:11px}.chap{font-size:10px}}
 body.letterbox .mark,body.letterbox .chap{top:calc(var(--bar) + clamp(12px,2vw,24px))}
 body.letterbox #ui{z-index:4}
 #hud.nomarkers .brk,#hud.nomarkers .lead{display:none}

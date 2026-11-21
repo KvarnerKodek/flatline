@@ -1,10 +1,17 @@
 import * as THREE from 'three';
+import { travelYaw } from './motion';
 import { waveHeight } from './water';
 
 /** Height of whatever the object floats or rests on at a world point. */
 export type Surface = (x: number, z: number, t: number) => number;
 
 export interface Pose { x: number; z: number; yaw: number; speed: number }
+
+/** The pose of something travelling along `at(t)`: it points where it goes and `speed` is metres per second, so a boat or cart never drives backwards. */
+export function poseAlong(at: (t: number) => THREE.Vector3, t: number): Pose {
+  const a = at(t - 0.05), b = at(t + 0.05), p = at(t);
+  return { x: p.x, z: p.z, yaw: travelYaw(at, t), speed: Math.hypot(b.x - a.x, b.z - a.z) / 0.1 };
+}
 
 /** Something that floats: it keeps its own pose and rides the same swell the water draws. */
 export class Placed {

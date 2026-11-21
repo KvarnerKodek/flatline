@@ -38,10 +38,11 @@ export function makeBirds(count = 9, seed = 3): Birds {
       for (const b of birds) {
         const a = b.a0 + t * b.w;
         b.g.position.set(c.x + Math.cos(a) * b.rad, c.y + b.h + Math.sin(t * 0.7 + b.ph) * 2, c.z + Math.sin(a) * b.rad);
-        b.g.rotation.y = -a + (b.w > 0 ? 0 : Math.PI);
-        const fl = Math.sin(t * b.f + b.ph) * 0.55;
+        const dir = Math.sign(b.w), beat = t * b.f + b.ph, glide = 0.35 + 0.65 * Math.sin(t * 0.3 + b.ph * 3) ** 2, fl = (Math.sin(beat) + 0.3 * Math.sin(2 * beat - 0.6)) * 0.5 * glide;
+        b.g.rotation.order = 'YXZ';
+        b.g.rotation.set(dir * 0.28, -a - dir * Math.PI / 2, -0.04 * Math.cos(beat) * glide);
+        b.g.position.y -= 0.35 * fl;
         b.wl.rotation.x = fl; b.wr.rotation.x = -fl;
-        b.g.rotation.z = b.w > 0 ? -0.2 : 0.2;
         b.g.scale.setScalar(1.6 * vis);
       }
     },

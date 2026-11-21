@@ -44,6 +44,13 @@ describe('terrain', () => {
     expect(standHeight(base, sites, 400, 0)).toBe(3);
   });
 
+  it('stands things on a continuous surface across the edge of a site', () => {
+    const flat = flattenSites((x, z) => 0.01 * x + 0.02 * z, sites), s = sites[0];
+    const xs = Array.from({ length: 400 }, (_, i) => s.x + s.rx * (0.5 + i * 0.004));
+    const jump = (f: (x: number) => number) => Math.max(...xs.slice(1).map((x, i) => Math.abs(f(x) - f(xs[i]))));
+    expect(jump((x) => standHeight(flat, sites, x, s.z))).toBeLessThan(jump((x) => flat(x, s.z)) + 0.02);
+  });
+
   it('joins bands into one increasing axis with no repeats', () => {
     const a = gridAxis([[-100, -20, 20], [-20, 20, 10], [20, 100, 20]]);
     expect(a).toEqual([-100, -80, -60, -40, -20, -10, 0, 10, 20, 40, 60, 80, 100]);
@@ -58,6 +65,7 @@ describe('terrain', () => {
       expect(p.getY(i)).toBeCloseTo(t.height(p.getX(i), p.getZ(i)), 4);
       expect(n.getY(i)).toBeGreaterThan(0);
     }
+    expect(t.mesh.userData.noEdge).toBe(true);
     expect(t.mesh.material).toBeInstanceOf(THREE.ShaderMaterial);
     expect(t.stand(100, -50)).toBeCloseTo(12.4, 9);
   });

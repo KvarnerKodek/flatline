@@ -28,7 +28,7 @@ export function makeSky(): THREE.Group {
           float e = clamp(d.y, 0., 1.);
           vec3 col = mix(uHorizon, uMid, smoothstep(0.,.18,e));
           col = mix(col, uZenith, smoothstep(.14,.8,e));
-          float glowH = pow(1.-e, 6.);
+          float glowH = pow(max(1.-e,0.), 6.);
           vec3 ld = normalize(uMoonDir);
           float toL = max(dot(d, ld), 0.);
           col += uHorizon*.35*glowH*(.3+.7*pow(toL,3.));

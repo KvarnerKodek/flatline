@@ -43,5 +43,6 @@ export function decal({ size, color = 0x000000, opacity = 0.4, map = softDisc() 
   const mat = new THREE.MeshBasicMaterial({ map, color, opacity, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat);
   mesh.userData.noEdge = true;
+  mesh.userData.qa = { role: 'decal' };
   return mesh;
 }

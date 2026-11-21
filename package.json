@@ -14,7 +14,10 @@
   "bin": {
     "flatline-render": "bin/render.mjs",
     "flatline-check": "bin/check.mjs",
-    "flatline-stills": "bin/stills.mjs"
+    "flatline-stills": "bin/stills.mjs",
+    "flatline-shard": "bin/shard.mjs",
+    "flatline-perf": "bin/perf.mjs",
+    "flatline-qa": "bin/qa.mjs"
   },
   "files": [
     "src",

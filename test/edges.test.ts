@@ -54,3 +54,13 @@ describe('depth pass membership', () => {
     expect(seen.veils).toEqual([p.group.children[0]]);
   });
 });
+
+describe('line taper', () => {
+  it('is uniform at 0, thickest near, thinnest far, and monotonic in between', async () => {
+    const { edgeTaper } = await import('../src/edges');
+    expect(edgeTaper(10, 0)).toBe(1); expect(edgeTaper(900, 0)).toBe(1);
+    expect(edgeTaper(10, 1)).toBeCloseTo(1.6); expect(edgeTaper(900, 1)).toBeCloseTo(0.5);
+    const w = [10, 50, 100, 200, 300, 450].map((z) => edgeTaper(z, 0.7));
+    w.slice(1).forEach((x, i) => expect(x).toBeLessThanOrEqual(w[i]));
+  });
+});

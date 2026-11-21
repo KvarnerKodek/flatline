@@ -3,9 +3,12 @@ import { G, HULL } from './toon';
 import { Post } from './post';
 import { Hud } from './hud';
 import type { HudOptions } from './hud';
-import { applyLook } from './look';
-import type { Film } from './timeline';
+import { applyLook, resolveLook } from './look';
+import { checkScript, type Film } from './timeline';
+import { checkFilm } from './easy';
 import { Soundtrack } from './soundtrack';
+import { updateWorld } from './world';
+import type { Qa } from './qa/registry';
 import './flatline.css';
 
 THREE.ColorManagement.enabled = false;
@@ -34,6 +37,13 @@ export function applyTheme(theme?: Theme) {
   for (const [k, v] of Object.entries(theme.vars ?? {})) document.documentElement.style.setProperty(k, v);
 }
 
+/** A paused film is redrawn this often (ms), enough to show late-loading textures without burning the GPU. */
+const IDLE_MS = 250;
+
+/** Whether the loop draws this tick: always while playing, otherwise only when something changed or the idle refresh is due; never in a hidden tab. */
+export const needsDraw = (o: { playing: boolean; hidden: boolean; dirty: boolean; t: number; drawnT: number; now: number; drawnAt: number }) =>
+  !o.hidden && (o.playing || o.dirty || o.t !== o.drawnT || o.now - o.drawnAt > IDLE_MS);
+
 /** Pixels drawn per frame at most, before the device pixel ratio is lowered. */
 const PIXEL_BUDGET = 2.6e6;
 
@@ -45,7 +55,9 @@ function precompile(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: T
   for (const o of hidden) o.visible = false;
 }
 
-export interface Player { seek(t: number): void; readonly duration: number; wav?(): string | Promise<string> }
+/** What the last rendered frame cost: draw calls and triangles across every pass, and the scene's object count. */
+export interface FrameStats { calls: number; triangles: number; objects: number; programs: number; geometries: number; textures: number }
+export interface Player { seek(t: number): void; readonly duration: number; wav?(): string | Promise<string>; stats(): FrameStats; readonly scene: THREE.Scene; /** Filled in for `flatline-qa`. */ qa?: Qa }
 
 declare global {
   interface Window { __flatline?: Player }
@@ -63,6 +75,9 @@ declare global {
 export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions = './', fallbackArg?: () => void, brandArg?: string): Promise<Player> {
   const opts: PlayOptions = typeof baseOrOptions === 'string' ? { base: baseOrOptions, fallback: fallbackArg, brand: brandArg } : baseOrOptions;
   const base = opts.base ?? './', fallback = opts.fallback, brand = opts.brand;
+  const bad = checkFilm(film);
+  if (bad.length) throw new Error(`flatline: the film is incomplete\n- ${bad.join('\n- ')}`);
+  checkScript(film).forEach((p) => console.warn('flatline script:', p));
   applyTheme(opts.theme);
   const q = new URLSearchParams(location.search);
   const canvas = ensure('gl', 'canvas') as HTMLCanvasElement;
@@ -76,11 +91,14 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   }
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 22000);
+  performance.mark('flatline:start');
   const world = await film.load(base);
+  performance.mark('flatline:loaded');
   const scene = film.scene(world);
-  if (film.look) applyLook(film.look);
-  if (film.look?.edges && !film.look.edges.hulls) scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m && !Array.isArray(m) && m.userData[HULL]) o.visible = false; });
-  const post = new Post(renderer, scene, camera, { ...film.look?.grade, ...film.grade }, { edges: film.look?.edges, haze: film.look?.haze });
+  const look = resolveLook(film.look);
+  applyLook(look);
+  if (look.edges && !look.edges.hulls) scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m && !Array.isArray(m) && m.userData[HULL]) o.visible = false; });
+  const post = new Post(renderer, scene, camera, { ...look.grade, ...film.grade }, { edges: look.edges, haze: look.haze });
   const render3d = q.has('render');
   const embed = q.has('embed');
   if (render3d) document.body.classList.add('render');
@@ -93,8 +111,9 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   let W = innerWidth, Hh = innerHeight;
   // Resolution is chosen once from a pixel budget so it never changes visibly mid-shot.
   const budgetDpr = () => (render3d ? devicePixelRatio || 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2, Math.sqrt(PIXEL_BUDGET / (W * Hh)))));
-  let dprCap = budgetDpr();
+  let dprCap = budgetDpr(), dirty = true;
   const applySize = () => {
+    dirty = true;
     renderer.setPixelRatio(dprCap);
     renderer.setSize(W, Hh, false);
     post.setSize(W, Hh, dprCap);
@@ -139,9 +158,12 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
   });
 
   const follow = film.follow?.(world) ?? [], sun = film.sun?.(world);
+  const fast = q.get('fast') !== '0';
   const inspect = q.get('cam')?.split(',').map(Number);
   if (inspect) document.body.classList.add('inspect');
+  renderer.info.autoReset = false;
   const render = (now: number) => {
+    renderer.info.reset();
     G.uTime.value = film.warp ? film.warp(t) : t;
     const f = film.frame(world, film.warp ? film.warp(t) : t);
     if (inspect) { f.cam.p.set(inspect[0], inspect[1], inspect[2]); f.cam.look.set(inspect[3], inspect[4], inspect[5]); if (inspect[6]) f.cam.fov = inspect[6]; }
@@ -153,9 +175,11 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
     camera.updateMatrixWorld();
     for (const o of follow) o.position.set(camera.position.x, o.userData.followY ?? camera.position.y, camera.position.z);
     hud.update(t, f.tracks, camera, W, Hh);
-    scene.updateMatrixWorld();
+    if (fast) updateWorld(scene); else scene.updateMatrixWorld();
+    scene.matrixWorldAutoUpdate = !fast;
     sun?.render(renderer, scene);
     post.render(t, f.fade, f.night, f.flash ?? 0);
+    scene.matrixWorldAutoUpdate = true;
     if (card && film.endCard) {
       const ca = Math.min(1, Math.max(0, (t - film.endCard.at + 1.2) / 1.8));
       card.style.opacity = String(ca);
@@ -166,15 +190,24 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
     film.afterPost?.(world, t, { renderer, camera, width: W, height: Hh, hud });
   };
 
-  const player: Player = { seek: (s) => { t = s; render(performance.now()); }, duration: film.duration, wav: sound && (() => sound.wavBase64()) };
+  const stats = (): FrameStats => {
+    let objects = 0;
+    scene.traverse(() => { objects++; });
+    const { render: r, memory: m, programs } = renderer.info;
+    return { calls: r.calls, triangles: r.triangles, objects, programs: programs?.length ?? 0, geometries: m.geometries, textures: m.textures };
+  };
+  const player: Player = { seek: (s) => { t = s; render(performance.now()); }, duration: film.duration, stats, scene, wav: sound && (() => sound.wavBase64()) };
   window.__flatline = player;
+  void import('./qa/registry').then((m) => m.installQa(player, scene, camera, player.seek, film.duration, canvas, film.qa?.(world)));
   precompile(renderer, scene, camera);
+  performance.mark('flatline:compiled');
   render(performance.now());
+  performance.mark('flatline:first-frame');
   document.getElementById('boot')?.remove();
   document.title = 'ready';
   say('ready');
 
-  let last = performance.now(), slow = 0, frames = 0;
+  let last = performance.now(), slow = 0, frames = 0, drawnT = t, drawnAt = last;
   const adapt = (dt: number) => {
     if (render3d || !playing) return;
     slow = Math.max(0, Math.min(90, slow + (dt > 0.026 ? 1 : -1)));
@@ -192,7 +225,7 @@ export async function play<W>(film: Film<W>, baseOrOptions: string | PlayOptions
       } else if (sound) {
         sound.sync(t, false);
       }
-      render(now);
+      if (needsDraw({ playing, hidden: document.hidden, dirty, t, drawnT, now, drawnAt })) { render(now); drawnT = t; drawnAt = now; dirty = false; }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);

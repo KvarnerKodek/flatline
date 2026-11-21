@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toon, hex, G, INK, HULL } from './toon';
+import { toon, G, INK, HULL } from './toon';
 
 const cache = new Map<string, THREE.ShaderMaterial>();
 const shared = (key: string, make: () => THREE.ShaderMaterial) => { let m = cache.get(key); if (!m) { m = make(); cache.set(key, m); } return m; };
@@ -53,7 +53,10 @@ export class Inst {
   mesh: THREE.InstancedMesh;
   private ink?: THREE.InstancedMesh;
   private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private e = new THREE.Euler(); private s = new THREE.Vector3(); private p = new THREE.Vector3();
+  private lo = new THREE.Vector3(); private hi = new THREE.Vector3();
+  private pad = 1;
   private cols?: Float32Array;
+  private colAttr?: THREE.InstancedBufferAttribute;
   constructor(public geo: THREE.BufferGeometry, public max: number, o: InstOpts = {}) {
     const mat = toon({ color: o.color ?? 0xffffff, instanceColors: o.colors, vertexColors: o.vertexColors, spec: o.spec ?? 0.05, emissive: o.emissive, emisAmt: o.emisAmt, emisNight: o.emisNight, side: o.side });
     if (o.fade) {
@@ -66,9 +69,10 @@ export class Inst {
       Object.assign(mat.uniforms, { uSwayAmp: { value: o.sway[0] }, uSwayH: { value: o.sway[1] }, uSwayB: { value: o.sway[2] ?? 0 } });
       mat.vertexShader = mat.vertexShader.replace('varying vec3 vN;', 'uniform float uTime, uSwayAmp, uSwayH, uSwayB; varying vec3 vN;').replace('vec4 w = modelMatrix*p;', 'vec4 w = modelMatrix*p;' + SWAY_GLSL + '\n');
     }
+    this.pad = 1 + (o.sway?.[0] ?? 0);
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
     this.mesh.frustumCulled = false; this.mesh.count = 0;
-    if (o.colors) { this.cols = new Float32Array(max * 3).fill(1); geo.setAttribute('iColor', new THREE.InstancedBufferAttribute(this.cols, 3)); }
+    if (o.colors) { this.cols = new Float32Array(max * 3).fill(1); geo.setAttribute('iColor', this.colAttr = new THREE.InstancedBufferAttribute(this.cols, 3)); }
     this.group.add(this.mesh);
     if (o.ink !== 0) {
       this.ink = new THREE.InstancedMesh(geo, shared('oi' + (o.ink ?? 2) + (o.sway ? 's' + o.sway.join('_') : ''), () => outlineI(o.ink ?? 2, o.sway)), max);
@@ -77,14 +81,51 @@ export class Inst {
     }
   }
   set(i: number, x: number, y: number, z: number, ry = 0, sx = 1, sy = sx, sz = sx, rx = 0, rz = 0) {
-    this.e.set(rx, ry, rz, 'YXZ'); this.q.setFromEuler(this.e);
-    this.m.compose(this.p.set(x, y, z), this.q, this.s.set(sx, sy, sz));
-    this.mesh.setMatrixAt(i, this.m);
+    if (rx || rz) {
+      this.e.set(rx, ry, rz, 'YXZ'); this.q.setFromEuler(this.e);
+      this.mesh.setMatrixAt(i, this.m.compose(this.p.set(x, y, z), this.q, this.s.set(sx, sy, sz)));
+    } else {
+      const a = this.mesh.instanceMatrix.array, o = i * 16, c = Math.cos(ry), s = Math.sin(ry);
+      a[o] = c * sx; a[o + 1] = 0; a[o + 2] = -s * sx; a[o + 3] = 0;
+      a[o + 4] = 0; a[o + 5] = sy; a[o + 6] = 0; a[o + 7] = 0;
+      a[o + 8] = s * sz; a[o + 9] = 0; a[o + 10] = c * sz; a[o + 11] = 0;
+      a[o + 12] = x; a[o + 13] = y; a[o + 14] = z; a[o + 15] = 1;
+    }
     if (i >= this.mesh.count) { this.mesh.count = i + 1; if (this.ink) this.ink.count = i + 1; }
   }
-  color(i: number, c: number) { if (!this.cols) return; const v = hex(c); this.cols[i * 3] = v.x; this.cols[i * 3 + 1] = v.y; this.cols[i * 3 + 2] = v.z; (this.geo.getAttribute('iColor') as THREE.BufferAttribute).needsUpdate = true; }
-  colorRGB(i: number, c: THREE.Color) { if (!this.cols) return; this.cols[i * 3] = c.r; this.cols[i * 3 + 1] = c.g; this.cols[i * 3 + 2] = c.b; (this.geo.getAttribute('iColor') as THREE.BufferAttribute).needsUpdate = true; }
-  commit() { this.mesh.instanceMatrix.needsUpdate = true; }
+  color(i: number, c: number) { this.colorRGB3(i, ((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255); }
+  colorRGB(i: number, c: THREE.Color) { this.colorRGB3(i, c.r, c.g, c.b); }
+  private colorRGB3(i: number, r: number, g: number, b: number) {
+    const a = this.cols;
+    if (!a) return;
+    a[i * 3] = r; a[i * 3 + 1] = g; a[i * 3 + 2] = b;
+    this.colAttr!.needsUpdate = true;
+  }
+  commit() {
+    const n = this.mesh.count, m = this.mesh.instanceMatrix;
+    m.clearUpdateRanges(); m.addUpdateRange(0, n * 16); m.needsUpdate = true;
+    this.bound(n);
+    if (!this.colAttr) return;
+    this.colAttr.clearUpdateRanges(); this.colAttr.addUpdateRange(0, n * 3); this.colAttr.needsUpdate = true;
+  }
+  /** Culls the whole group while it is off screen: a sphere around every instance, padded for scale, wind and ink. */
+  private bound(n: number) {
+    if (!n) return;
+    const a = this.mesh.instanceMatrix.array, lo = this.lo.set(Infinity, Infinity, Infinity), hi = this.hi.set(-Infinity, -Infinity, -Infinity);
+    let k = 0;
+    for (let i = 0, o = 12; i < n; i++, o += 16) {
+      const x = a[o], y = a[o + 1], z = a[o + 2];
+      lo.x = Math.min(lo.x, x); lo.y = Math.min(lo.y, y); lo.z = Math.min(lo.z, z); hi.x = Math.max(hi.x, x); hi.y = Math.max(hi.y, y); hi.z = Math.max(hi.z, z);
+      const c = o - 12;
+      k = Math.max(k, Math.abs(a[c]) + Math.abs(a[c + 1]) + Math.abs(a[c + 2]), Math.abs(a[c + 4]) + Math.abs(a[c + 5]) + Math.abs(a[c + 6]), Math.abs(a[c + 8]) + Math.abs(a[c + 9]) + Math.abs(a[c + 10]));
+    }
+    const g = this.geo.boundingSphere ?? (this.geo.computeBoundingSphere(), this.geo.boundingSphere!);
+    const s = this.mesh.boundingSphere ?? (this.mesh.boundingSphere = new THREE.Sphere());
+    s.center.addVectors(lo, hi).multiplyScalar(0.5);
+    s.radius = lo.distanceTo(hi) / 2 + (g.radius + g.center.length()) * k + this.pad;
+    this.mesh.frustumCulled = true;
+    if (this.ink) { this.ink.boundingSphere = s; this.ink.frustumCulled = true; }
+  }
   hide() { this.mesh.count = 0; if (this.ink) this.ink.count = 0; }
 }
 

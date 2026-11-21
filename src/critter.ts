@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { taperedLimb } from './rig';
 import { glow, inked, outline, toon } from './toon';
 
 const TAU = Math.PI * 2;
@@ -69,6 +70,8 @@ export class Critter {
   readonly seed: number;
   private armL = new THREE.Group();
   private armR = new THREE.Group();
+  private elbowL = new THREE.Group();
+  private elbowR = new THREE.Group();
   private tail: THREE.Object3D;
   private tail2: THREE.Object3D;
   private antenna: THREE.Object3D;
@@ -106,9 +109,14 @@ export class Critter {
     this.texture.repeat.set(1 / EXPRESSIONS.length, 1);
     const w = 1.5, h = 0.95;
     this.head.add(new THREE.Mesh(new THREE.SphereGeometry(0.318, 28, 16, Math.PI / 2 - w / 2, w, Math.PI / 2 - h / 2, h).scale(1.12, 0.92, 1), new THREE.MeshBasicMaterial({ map: this.texture, fog: false })));
-    for (const [arm, s] of [[this.armL, -1], [this.armR, 1]] as const) {
-      const hand = part(new THREE.SphereGeometry(0.09, 10, 8).translate(0, -0.3, 0), acc);
-      arm.add(part(new THREE.CapsuleGeometry(0.055, 0.2, 4, 8).translate(0, -0.14, 0), shell), hand);
+    for (const [arm, elbow, s] of [[this.armL, this.elbowL, -1], [this.armR, this.elbowR, 1]] as const) {
+      elbow.position.y = -0.17;
+      arm.add(part(new THREE.SphereGeometry(0.062, 10, 8), shell), part(taperedLimb(0.062, 0.05, 0.17 - 0.05, 0.06), shell), elbow);
+      elbow.add(part(new THREE.SphereGeometry(0.05, 10, 8), shell), part(taperedLimb(0.05, 0.04, 0.1), shell));
+      const hand = new THREE.Group();
+      hand.position.y = -0.17;
+      hand.add(part(new THREE.SphereGeometry(0.075, 12, 10).scale(1, 1.05, 0.9), acc), part(new THREE.SphereGeometry(0.03, 8, 6).translate(s * -0.05, 0.0, 0.045), acc));
+      elbow.add(hand);
       arm.position.set(s * 0.36, 0.16, 0.02);
     }
     const nozzle = part(new THREE.CylinderGeometry(0.16, 0.08, 0.14, 12).translate(0, -0.4, 0), metal);
@@ -135,6 +143,9 @@ export class Critter {
     const sway = Math.sin(t * 3.1 + seed) * 0.12;
     this.armL.rotation.set(0, 0, -0.35 - arms * 1.9 + sway);
     this.armR.rotation.set(0, 0, 0.35 + arms * 1.9 - sway);
+    const bend = 0.25 + 0.35 * Math.min(1, arms), trail = Math.sin(t * 3.1 + seed - 0.8) * 0.12 - sway;
+    this.elbowL.rotation.set(0, 0, bend - trail * 0.9);
+    this.elbowR.rotation.set(0, 0, -(bend + trail * 0.9));
     this.head.rotation.set(0, o.look ?? 0, Math.sin(t * 1.3 + seed) * 0.03);
     this.jet.scale.setScalar(0.9 * (0.85 + 0.15 * Math.sin(t * 30 + seed) * hover) * (0.4 + 0.6 * hover));
     (this.jet.material as THREE.SpriteMaterial).opacity = 0.9 * hover;

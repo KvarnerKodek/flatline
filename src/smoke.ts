@@ -19,11 +19,14 @@ export interface SmokeOpts {
   wobble?: number;
 }
 
+/** Breeze strength at time `t`, 0.6 to 1.4: smoke leans harder and softer in slow gusts. */
+export const gust = (t: number) => 1 + 0.4 * Math.sin(t * 0.55) * Math.cos(t * 0.23 + 1);
+
 /** Where puff `j` of source `i` is `u` (0 to 1) through its life, relative to the source, and how big it is. Pure in `t`. */
 export function puffAt(t: number, i: number, j: number, o: Required<SmokeOpts>) {
   const u = (t * o.rate + j / o.per + i * 0.37) % 1, k = Math.sin(u * TAU * 2 + i + j) * 0.5 * o.wobble;
   const r = (o.radius[0] + u * (o.radius[1] - o.radius[0])) * ss(0, 0.12, u) * (1 - ss(0.75, 1, u));
-  return { x: u * u * o.lean + k * u, y: u * o.rise, z: k * 0.6, r };
+  return { x: u * u * o.lean * gust(t) + k * u, y: u * o.rise, z: k * 0.6, r };
 }
 
 /** Soft cel puffs rising from chimneys, stacks or fires and leaning with a steady breeze. A pure function of time. */
