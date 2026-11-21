@@ -404,7 +404,8 @@ export function figure(o: FigureOpts = {}): Figure {
       const period = 3.2, beat = t / period + hash(seed), k = Math.floor(beat), since = (fract(beat) - 0.35 * hash(k + seed)) * period;
       const blink = since > 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       const look = Math.floor(t * 0.9 + seed), gx = (hash(look) - 0.5) * 0.012 * (0.4 + still), gy = (hash(look + 3) - 0.5) * 0.008 * (0.4 + still);
-      for (const e of eyes) { e.scale.set(1, 1 - 0.9 * blink, 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy - 0.024 * blink; e.children[1].visible = e.children[2].visible = blink < 0.5; }
+      const mood = p.mood ?? 0.6, joy = smooth01((mood - 0.65) / 0.35), squint = 0.2 * joy;
+      for (const e of eyes) { e.scale.set(1, (1 - 0.9 * blink) * (1 - squint), 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy - 0.024 * blink; e.children[1].visible = e.children[2].visible = blink < 0.5; }
 
       // Follow-through: braids hang with gravity and trail the walk; the feather bounces.
       const lean = spine.rotation.z + neck.rotation.z + head.rotation.z, roll = pelvis.rotation.x + spine.rotation.x + neck.rotation.x + head.rotation.x;
@@ -414,11 +415,9 @@ export function figure(o: FigureOpts = {}): Figure {
       });
       if (feather) feather.rotation.set(0, 0, Math.sin(w * 2 - 0.8) * st * 0.25 + Math.sin(t * 2.1 + seed) * 0.05 * life);
 
-      const mood = p.mood ?? 0.6;
       mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1);
-      const open = smooth01((mood - 0.65) / 0.35);
-      grin.visible = open > 0.01;
-      grin.scale.set(1, open, 0.4 + 0.6 * open);
+      grin.visible = joy > 0.01;
+      grin.scale.set(1, joy, 0.4 + 0.6 * joy);
       brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.5 * Math.max(0, -mood); br.position.y = 0.072 + 0.012 * Math.abs(mood); });
     },
   };
