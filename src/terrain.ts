@@ -197,7 +197,7 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
         vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
         col += uShadow*.2*(smoothstep(-.1,.0,nl)-smoothstep(.0,.1,nl))*base;
         col *= mix(vec3(1.), vec3(.66,.7,.9), sh);
-        float rim = pow(1.-max(dot(n, normalize(cameraPosition - vW)), 0.), 3.);
+        float rim = pow(1.-clamp(dot(n, normalize(cameraPosition - vW)), 0., 1.), 3.);
         col += vec3(1.,.88,.58)*rim*.2*smoothstep(-.1,.5,nl)*(1.-smoothstep(600.,1800.,dist));
         gl_FragColor = vec4(applyFog(col, dist), 1.);
       }`,

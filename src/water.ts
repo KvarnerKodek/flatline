@@ -104,7 +104,7 @@ export function makeWater(): THREE.Mesh {
         vec2 rn = vec2(vnoise(q+vec2(.1,0.)+uTime*.2)-vnoise(q-vec2(.1,0.)+uTime*.2), vnoise(q+vec2(0.,.1)-uTime*.2)-vnoise(q-vec2(0.,.1)-uTime*.2))*.35*uSea;
         vec3 n = normalize(vec3(-dd.x-rn.x, 1., -dd.y-rn.y));
         vec3 v = normalize(cameraPosition - vW);
-        float nv = max(dot(n,v),0.);
+        float nv = clamp(dot(n,v),0.,1.);
         float fres = pow(1.-nv, 4.);
         float skyMix = clamp(fres*1.35, 0., 1.);
         vec3 base = mix(uDeep, uShallow, smoothstep(-.35,.45,vH)*.4 + .4 + .1*rp);
@@ -135,8 +135,9 @@ export function makeWater(): THREE.Mesh {
           float back = -along/WS; side /= WS;
           if (back > -1.5 && back < 60. && B.w > .1) {
             float spread = .15 + back*.26;
-            float kel = exp(-pow(side/(.55+back*.05),2.))*smoothstep(-1.5,1.,back)*(1.-smoothstep(10.,60.,back));
-            float vee = exp(-pow((abs(side)-spread*back*.55-.6)/(.45+back*.035),2.))*smoothstep(0.,4.,back)*(1.-smoothstep(25.,85.,back));
+            float ks = side/(.55+back*.05), vs = (abs(side)-spread*back*.55-.6)/(.45+back*.035);
+            float kel = exp(-ks*ks)*smoothstep(-1.5,1.,back)*(1.-smoothstep(10.,60.,back));
+            float vee = exp(-vs*vs)*smoothstep(0.,4.,back)*(1.-smoothstep(25.,85.,back));
             float n1 = vnoise(vec2(back*.55, side*1.2)+uTime*.6);
             foam += clamp(kel*.9*smoothstep(.3,.5,n1) + vee*.55*smoothstep(.25,.55,vnoise(vec2(back*.3,side*.9))),0.,1.) * clamp(B.w*.5,.25,1.);
           }

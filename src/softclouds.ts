@@ -54,7 +54,7 @@ export function makeSoftClouds(o: SoftCloudOpts = {}): SoftClouds {
         vec3 col = mix(uCs, uCm, smoothstep(-.45,.05,nl + wash*.25));
         col = mix(col, uCl, smoothstep(-.2,.15,nl + wash*.2));
         col = mix(col, uCs*.94, (1.-smoothstep(-.7,.15,n.y))*.55);
-        float rim = pow(1.-max(dot(n,v),0.),2.6)*smoothstep(-.2,.6,nl);
+        float rim = pow(1.-clamp(dot(n,v),0.,1.),2.6)*smoothstep(-.2,.6,nl);
         col += uLightCol*.22*rim;
         col *= 1. - .22*uNight;
         float d = length(cameraPosition - vW), f = 1.-exp(-pow(d*uFogD*.2,1.35));

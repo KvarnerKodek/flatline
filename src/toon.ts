@@ -118,7 +118,7 @@ void main(){
   float wl = smoothstep(-.2,1.1,vW.y);
   col *= mix(1., mix(.72, 1., wl), uWaterline);
   col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
-  float rim = pow(1.-max(dot(n,v),0.),3.);
+  float rim = pow(1.-clamp(dot(n,v),0.,1.),3.);
   col += uRim*smoothstep(.46-sf,.52+sf,rim)*(.3+.7*hemi)*mix(.38,.75,uNight)*uRimK;
   col += base*vec3(.95,.78,.45)*(1.-hemi)*.08*min(uSoft,1.)*(1.-uNight);
   vec3 h = normalize(uLightDir+v);
