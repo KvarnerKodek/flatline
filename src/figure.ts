@@ -242,7 +242,7 @@ export function figure(o: FigureOpts = {}): Figure {
     face(new THREE.SphereGeometry(0.0095, 8, 6), 0xffffff, 0.017, 0.013, s * -0.004, e);
     face(new THREE.SphereGeometry(0.0045, 8, 6), 0xffffff, 0.0168, -0.012, s * 0.008, e);
     eyes.push(e);
-    brows.push(face(new THREE.TorusGeometry(0.05, 0.0072, 5, 12, Math.PI * 0.38).rotateZ(Math.PI * 0.31).translate(0, -0.05, 0).rotateY(Math.PI / 2), hair, 0.207, 0.072, s * 0.084));
+    brows.push(face(new THREE.TorusGeometry(0.05, 0.0095, 5, 12, Math.PI * 0.38).rotateZ(Math.PI * 0.31).translate(0, -0.05, 0).rotateY(Math.PI / 2), new THREE.Color(hair).lerp(new THREE.Color(0x1b0f00), 0.5).getHex(), 0.207, 0.072, s * 0.084));
     brows[brows.length - 1].rotation.y = -s * 0.37;
     face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
   }
