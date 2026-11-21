@@ -182,10 +182,10 @@ export function figure(o: FigureOpts = {}): Figure {
     part(wr, new THREE.CapsuleGeometry(0.024, 0.032, 4, 14).scale(0.7, 1, 1.85).translate(0.004, -0.036, 0), skin);
     fingers.position.set(0.004, -0.064, 0);
     wr.add(fingers);
-    part(fingers, new THREE.CapsuleGeometry(0.021, 0.014, 4, 14).scale(0.68, 1, 1.8).translate(0, -0.016, 0), skin);
+    part(fingers, new THREE.CapsuleGeometry(0.0225, 0.026, 4, 14).scale(0.68, 1, 1.8).translate(0, -0.014, 0), skin);
     tip.position.y = -0.034;
     fingers.add(tip);
-    part(tip, new THREE.CapsuleGeometry(0.019, 0.008, 4, 14).scale(0.66, 1, 1.75).translate(0, -0.012, 0), skin);
+    part(tip, new THREE.CapsuleGeometry(0.0205, 0.016, 4, 14).scale(0.66, 1, 1.75).translate(0, -0.012, 0), skin);
     thumb.position.set(0.012, -0.03, s * -0.036);
     thumb.rotation.set(s * 0.35, 0, 0.45);
     wr.add(thumb);
