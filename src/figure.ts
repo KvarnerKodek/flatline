@@ -236,6 +236,7 @@ export function figure(o: FigureOpts = {}): Figure {
     head.add(e);
     face(new THREE.SphereGeometry(0.031, 12, 10).scale(0.6, 1.2, 1), 0x1b0f00, 0, 0, 0, e);
     face(new THREE.SphereGeometry(0.0095, 8, 6), 0xffffff, 0.017, 0.013, s * -0.004, e);
+    face(new THREE.SphereGeometry(0.0045, 8, 6), 0xffffff, 0.0168, -0.012, s * 0.008, e);
     eyes.push(e);
     brows.push(face(new THREE.CapsuleGeometry(0.008, 0.044, 2, 6).rotateX(Math.PI / 2), hair, 0.216, 0.072, s * 0.084));
     face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);

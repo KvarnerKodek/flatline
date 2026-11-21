@@ -156,7 +156,7 @@ describe('acting curves', () => {
 describe('idle life', () => {
   it('blinks every few seconds, each blink a few frames long, at different times for different people', () => {
     const a = figure({}), b = figure({});
-    const shut = (f: ReturnType<typeof figure>) => f.joints.head.children.filter((c) => c.type === 'Group' && c.children.length === 2 && (c as THREE.Group).position.x > 0.2).every((e) => e.scale.y < 0.5);
+    const shut = (f: ReturnType<typeof figure>) => f.joints.head.children.filter((c) => c.type === 'Group' && c.children.length >= 2 && (c as THREE.Group).position.x > 0.2).every((e) => e.scale.y < 0.5);
     const starts: number[][] = [[], []];
     const runs = (f: ReturnType<typeof figure>, s: number[]) => { const out: number[] = []; let n = 0; for (let k = 0; k < 30 * 30; k++) { f.pose({ t: k / 30 }); if (shut(f)) { if (!n) s.push(k); n++; } else if (n) { out.push(n); n = 0; } } return out; };
     const ra = runs(a, starts[0]); runs(b, starts[1]);
