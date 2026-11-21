@@ -186,10 +186,10 @@ export function lightHouse(hs: House, a: number) {
   hs.lamp.visible = a > 0.001;
 }
 
-export interface Placed { house: House; x: number; y: number; z: number; yaw: number; scale?: number }
+export interface PlacedHouse { house: House; x: number; y: number; z: number; yaw: number; scale?: number }
 
 /** Bakes placed houses into one mesh per material, so a whole town draws in three calls. */
-export function bakeTown(placed: Placed[]): THREE.Group {
+export function bakeTown(placed: PlacedHouse[]): THREE.Group {
   const parts: THREE.BufferGeometry[][] = [[], [], []], mats: THREE.Material[] = [];
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
   for (const o of placed) {
