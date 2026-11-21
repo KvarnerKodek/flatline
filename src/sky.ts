@@ -25,7 +25,7 @@ export function makeSky(): THREE.Group {
         uniform float uStars,uMoon,uSun,uCover;
         void main(){
           vec3 d = normalize(vD);
-          float e = max(d.y, 0.);
+          float e = clamp(d.y, 0., 1.);
           vec3 col = mix(uHorizon, uMid, smoothstep(0.,.18,e));
           col = mix(col, uZenith, smoothstep(.14,.8,e));
           float glowH = pow(max(1.-e,0.), 6.);
@@ -46,7 +46,7 @@ export function makeSky(): THREE.Group {
             float big = step(.972,h2) * (smoothstep(.3,.0,r2) + .35*smoothstep(.5,.0,r2));
             vec3 tint = mix(vec3(.75,.85,1.), vec3(1.,.9,.75), fract(h2*91.));
             col += tint*big*(.65+.35*sin(uTime*(1.+h2*2.)+h2*60.))*uStars*smoothstep(.03,.3,d.y);
-            float mw = exp(-pow(dot(d, normalize(vec3(.35,.75,-.55))),2.)*14.) * smoothstep(.28,.62,fbm(d.xz*14./(d.y+.4)+5.));
+            float mwd = dot(d, normalize(vec3(.35,.75,-.55))); float mw = exp(-mwd*mwd*14.) * smoothstep(.28,.62,fbm(d.xz*14./(d.y+.4)+5.));
             col += vec3(.18,.24,.42)*mw*.5*uStars*smoothstep(.05,.4,d.y);
           }
           // moon

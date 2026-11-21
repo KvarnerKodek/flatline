@@ -58,12 +58,12 @@ export function makeSoftClouds(o: SoftCloudOpts = {}): SoftClouds {
   const light = new THREE.Vector3(...(o.light ?? [1, 1, 1])), mid = new THREE.Vector3(...(o.mid ?? [0.97, 0.975, 1])), shade = new THREE.Vector3(...(o.shade ?? [0.76, 0.79, 0.96]));
   const mat = new THREE.ShaderMaterial({
     uniforms: { ...G, uCl: { value: light }, uCm: { value: mid }, uCs: { value: shade } },
-    vertexShader: 'attribute float aH, aC; varying float vH, vC; varying vec3 vN; varying vec3 vW; void main(){ vH = aH; vC = aC; vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }',
+    vertexShader: 'attribute float aH, aC; varying float vH, vC; varying vec3 vN; varying vec3 vW; void main(){ vH = aH; vC = aC; vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; vN = mat3(modelMatrix)*normal; gl_Position = projectionMatrix*viewMatrix*w; }',
     fragmentShader: /* glsl */ `
       ${COMMON}
       uniform vec3 uCl, uCm, uCs; varying float vH, vC; varying vec3 vN; varying vec3 vW;
       void main(){
-        vec3 n = normalize(vN), v = normalize(cameraPosition - vW);
+        vec3 n = unit(vN), v = normalize(cameraPosition - vW);
         float nl = dot(n, uLightDir);
         float wash = fbm(vW.xz*.004 + vW.y*.01) - .5;
         vec3 col = mix(uCs, uCm, smoothstep(-.45,.05,nl + wash*.25));
@@ -72,7 +72,7 @@ export function makeSoftClouds(o: SoftCloudOpts = {}): SoftClouds {
         col = mix(col, uCs, (1.-smoothstep(.0,.55,vH))*.4);
         col = mix(col, uCs*.92, smoothstep(.1,.9,vC)*.55);
         col = mix(col, uCl, smoothstep(.7,1.,vH)*.25*smoothstep(-.3,.3,nl));
-        float rim = pow(max(1.-dot(n,v),0.),2.6)*smoothstep(-.2,.6,nl);
+        float rim = pow(1.-clamp(dot(n,v),0.,1.),2.6)*smoothstep(-.2,.6,nl);
         col += uLightCol*.22*rim;
         col *= 1. - .22*uNight;
         float d = length(cameraPosition - vW), f = 1.-exp(-pow(d*uFogD*.2,1.35));

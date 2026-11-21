@@ -32,7 +32,11 @@ export const G = {
   uOutlineK: { value: 1 },
 };
 
+/** Normalises a vector without ever dividing by zero: a normal interpolated to zero would otherwise be NaN, and bloom spreads one NaN pixel into a black block. */
+export const UNIT = /* glsl */ `vec3 unit(vec3 v){ return v*inversesqrt(max(dot(v,v),1e-12)); }`;
+
 export const COMMON = /* glsl */ `
+${UNIT}
 uniform float uTime, uFogD, uNight, uSea, uWaterline, uPaint, uSoft, uSpecK, uRimK, uOutlineK;
 uniform vec3 uLightDir, uLightCol, uAmb, uShadow, uRim, uFog;
 uniform vec2 uRes;
@@ -64,6 +68,7 @@ float shadowLookup(sampler2D map, vec4 at, float nl, float scale, vec2 grad){
 `;
 
 const TOON_VS = /* glsl */ `
+${UNIT}
 varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
 uniform mat4 uShadowMat, uShadowMatN;
 #ifdef ICOL
@@ -74,7 +79,7 @@ void main(){
   #ifdef USE_INSTANCING
   p = instanceMatrix*p; n = mat3(instanceMatrix)*n;
   #endif
-  vec4 w = modelMatrix*p; vW = w.xyz; vN = normalize(mat3(modelMatrix)*n);
+  vec4 w = modelMatrix*p; vW = w.xyz; vN = unit(mat3(modelMatrix)*n);
   vC = vec3(1.);
   #ifdef USE_COLOR
   vC = color;
@@ -113,7 +118,7 @@ void main(){
     base = mix(base, base*vec3(1.05,1.02,.9), uPaint*fadeP*smoothstep(.0,.5,wash));
   }
   base *= 1. + uGrain*((step(.5, vnoise(vW.xz*.55))-.5)*.07 + (vnoise(vW.xz*.07)-.5)*.16 + (step(.62, vnoise(vW.xz*2.3+7.))-.3)*.035);
-  vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
+  vec3 n = unit(vN); if(!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vW);
   float nl = dot(n, uLightDir);
   nl = mix(nl, min(nl, -.2), nl > 0. ? sunShadow(nl) : 0.);
@@ -130,7 +135,7 @@ void main(){
   float wl = smoothstep(-.2,1.1,vW.y);
   col *= mix(1., mix(.72, 1., wl), uWaterline);
   col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
-  float rim = pow(max(1.-dot(n,v),0.),3.);
+  float rim = pow(1.-clamp(dot(n,v),0.,1.),3.);
   col += uRim*smoothstep(.46-sf,.52+sf,rim)*(.3+.7*hemi)*mix(.38,.75,uNight)*uRimK*mix(.45,1.,smoothstep(.3,-.3,nl));
   col += base*vec3(.95,.78,.45)*(1.-hemi)*.08*min(uSoft,1.)*(1.-uNight);
   vec3 h = normalize(uLightDir+v);

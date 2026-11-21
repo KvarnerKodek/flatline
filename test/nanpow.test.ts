@@ -4,7 +4,7 @@ import { LuminosityHighPassShader } from 'three/examples/jsm/shaders/LuminosityH
 
 describe('shader pow safety', () => {
   it('never raises 1-x to a power unclamped (NaN when x rounds above 1, smeared by bloom into black blocks)', () => {
-    const bad = readdirSync('src').filter((f) => f.endsWith('.ts')).filter((f) => /pow\(1\.-(?!max\()/.test(readFileSync(`src/${f}`, 'utf8')) || /pow\(1\.-max\(/.test(readFileSync(`src/${f}`, 'utf8')));
+    const bad = readdirSync('src').filter((f) => f.endsWith('.ts')).filter((f) => /pow\(1\.-(?!clamp\()/.test(readFileSync(`src/${f}`, 'utf8')) || /pow\(1\.-max\(/.test(readFileSync(`src/${f}`, 'utf8')));
     expect(bad).toEqual([]);
   });
 

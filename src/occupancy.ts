@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { G, COMMON } from './toon';
+import { G, COMMON, UNIT } from './toon';
 
 export interface Obstacle { x: number; z: number; r: number; h: number }
 
@@ -8,8 +8,9 @@ const CELL0 = 6.4;
 const RANGE0 = (N * CELL0) / 2;
 
 const VS = /* glsl */ `
+${UNIT}
 attribute vec4 iCol; varying vec4 vC; varying vec3 vN; varying vec3 vW;
-void main(){ vec4 p = instanceMatrix*vec4(position,1.); vec4 w = modelMatrix*p; vW = w.xyz; vN = normalize(mat3(modelMatrix)*mat3(instanceMatrix)*normal); vC = iCol; gl_Position = projectionMatrix*viewMatrix*w; }`;
+void main(){ vec4 p = instanceMatrix*vec4(position,1.); vec4 w = modelMatrix*p; vW = w.xyz; vN = unit(mat3(modelMatrix)*mat3(instanceMatrix)*normal); vC = iCol; gl_Position = projectionMatrix*viewMatrix*w; }`;
 const FS = /* glsl */ `
 ${COMMON}
 varying vec4 vC; varying vec3 vN; varying vec3 vW;

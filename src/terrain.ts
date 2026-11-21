@@ -159,7 +159,7 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
       float segDist(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-4),0.,1.); return length(pa-ba*h); }
       void main(){
         vec2 p = vW.xz; float dist = length(vW - cameraPosition);
-        vec3 n = normalize(vN);
+        vec3 n = unit(vN);
         float n1 = fbm(p*.009), n2 = fbm(p*.04+7.), n3 = fbm(p*.22+3.);
         vec3 g1 = uGrass[0], g2 = uGrass[1], g3 = uGrass[2], g4 = uGrass[3];
         float mpp = length(fwidth(p)), res = 1. - smoothstep(.7,2.5,mpp);
@@ -202,7 +202,7 @@ export function paintedTerrain(o: TerrainOpts): PaintedTerrain {
         vec3 col = mix(shade, mid, b1); col = mix(col, lit, b2);
         col += uShadow*.2*(smoothstep(-.1,.0,nl)-smoothstep(.0,.1,nl))*base;
         col *= mix(vec3(1.), vec3(.66,.7,.9), sh);
-        float rim = pow(max(1.-dot(n, normalize(cameraPosition - vW)), 0.), 3.);
+        float rim = pow(1.-clamp(dot(n, normalize(cameraPosition - vW)), 0., 1.), 3.);
         col += vec3(1.,.88,.58)*rim*.2*smoothstep(-.1,.5,nl)*(1.-smoothstep(600.,1800.,dist));
         gl_FragColor = vec4(applyFog(col, dist), 1.);
       }`,

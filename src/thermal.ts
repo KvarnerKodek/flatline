@@ -5,10 +5,16 @@ const HEAT = new THREE.ShaderMaterial({
   vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
   fragmentShader: /* glsl */ `
     uniform float uHeat; varying vec3 vW;
-    vec3 iron(float h){ float g = clamp((h-.12)/.8,0.,1.); return vec3(pow(g,.8)); }
+    vec3 iron(float h){
+      float g = pow(clamp((h-.12)/.8,0.,1.),.65)*4.;
+      vec3 c = mix(vec3(.02,0.,.10), vec3(.30,0.,.42), smoothstep(0.,1.,g));
+      c = mix(c, vec3(.80,.12,.28), smoothstep(1.,2.,g));
+      c = mix(c, vec3(1.,.58,.06), smoothstep(2.,3.,g));
+      return mix(c, vec3(1.,.96,.68), smoothstep(3.,4.,g));
+    }
     void main(){
       vec3 fn = normalize(cross(dFdx(vW), dFdy(vW)));
-      float h = clamp(uHeat + fn.y*.07 + fn.x*.05 + smoothstep(0.,7.,vW.y)*.14 + (fract(sin(dot(gl_FragCoord.xy, vec2(12.9,78.2)))*43758.5)-.5)*.04, 0., 1.);
+      float h = clamp(uHeat + fn.y*.17 + fn.x*.11 + smoothstep(0.,7.,vW.y)*.2 + (fract(sin(dot(gl_FragCoord.xy, vec2(12.9,78.2)))*43758.5)-.5)*.05, 0., 1.);
       gl_FragColor = vec4(iron(h), 1.);
     }`,
 });
