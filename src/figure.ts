@@ -404,7 +404,7 @@ export function figure(o: FigureOpts = {}): Figure {
       const period = 3.2, beat = t / period + hash(seed), k = Math.floor(beat), since = (fract(beat) - 0.35 * hash(k + seed)) * period;
       const blink = since > 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
       const look = Math.floor(t * 0.9 + seed), gx = (hash(look) - 0.5) * 0.012 * (0.4 + still), gy = (hash(look + 3) - 0.5) * 0.008 * (0.4 + still);
-      for (const e of eyes) { e.scale.set(1, 1 - 0.9 * blink, 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy; }
+      for (const e of eyes) { e.scale.set(1, 1 - 0.9 * blink, 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy - 0.024 * blink; e.children[1].visible = e.children[2].visible = blink < 0.5; }
 
       // Follow-through: braids hang with gravity and trail the walk; the feather bounces.
       const lean = spine.rotation.z + neck.rotation.z + head.rotation.z, roll = pelvis.rotation.x + spine.rotation.x + neck.rotation.x + head.rotation.x;
