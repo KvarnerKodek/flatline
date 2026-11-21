@@ -159,6 +159,8 @@ export function figure(o: FigureOpts = {}): Figure {
     part(spine, new THREE.BoxGeometry(0.03, 0.05, 0.2).translate(0.205 * b, 0.48, 0), leather);
   } else if (!dress) part(spine, new THREE.CylinderGeometry(0.19 * b, 0.26 * b, 0.68, 14).translate(0, 0.32, 0), coat);
   else part(spine, new THREE.CylinderGeometry(0.19 * b, 0.22 * b, 0.4, 14).translate(0, 0.46, 0), coat);
+  const yoke = dirndl ? 0.155 * b : 0.19 * b;
+  part(spine, new THREE.SphereGeometry(yoke, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.42, 1.25), dirndl ? shirt : leder ? o.coat ?? shirt : coat, 0, dirndl ? 0.72 : 0.66, 0);
   if (o.apron !== undefined && !dirndl && !dress) part(spine, garment([[0.22 * b, 0.6], [0.24 * b, 0.4], [0.29 * b, 0.0]], 4, 0.008, Math.PI / 2 - 0.85, 1.7), o.apron);
   if (o.scarf !== undefined) part(spine, new THREE.TorusGeometry(0.15, 0.065, 8, 16).rotateX(Math.PI / 2), o.scarf, 0, 0.68, 0);
 
