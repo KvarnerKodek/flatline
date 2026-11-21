@@ -239,9 +239,9 @@ export function figure(o: FigureOpts = {}): Figure {
     face(new THREE.SphereGeometry(0.0095, 8, 6), 0xffffff, 0.017, 0.013, s * -0.004, e);
     eyes.push(e);
     brows.push(face(new THREE.CapsuleGeometry(0.008, 0.044, 2, 6).rotateX(Math.PI / 2), hair, 0.216, 0.072, s * 0.084));
-    part(head, new THREE.SphereGeometry(0.036, 10, 8).scale(0.35, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
+    face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
   }
-  part(head, new THREE.SphereGeometry(0.03, 10, 8).scale(1.2, 0.9, 0.9), skin, 0.232, -0.028, 0);
+  face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.2, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.232, -0.028, 0);
   const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.216, -0.095, 0);
   let feather: THREE.Group | undefined;
   if (o.hat !== undefined && o.tyrolean) {
