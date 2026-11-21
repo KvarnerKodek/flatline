@@ -39,4 +39,18 @@ describe('depth pass membership', () => {
     expect(depthSource(new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending }))).toBeUndefined();
     expect(depthSource(undefined)).toBeUndefined();
   });
+
+  it('keeps puffs out of the depth pass but lets them veil the ink and haze behind them', async () => {
+    const THREE = await import('three');
+    const { EdgePass } = await import('../src/edges');
+    const { Puffs } = await import('../src/motes');
+    const scene = new THREE.Scene(), p = new Puffs(4), wall = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    p.begin(); p.add(0, 0, 0, 1); p.end();
+    scene.add(p.group, wall);
+    const e = new EdgePass(scene, new THREE.PerspectiveCamera());
+    e.scan();
+    const seen = e as unknown as { swaps: { o: unknown }[]; veils: unknown[] };
+    expect(seen.swaps.map((s) => s.o)).toEqual([wall]);
+    expect(seen.veils).toEqual([p.group.children[0]]);
+  });
 });

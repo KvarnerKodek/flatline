@@ -152,7 +152,8 @@ export class Arc {
 /**
  * Soft billowing puffs a film places itself: engine steam, chimney smoke, dust. Each puff is a camera-facing lobed blob
  * with a sunlit top, a lavender cel shadow underneath and a feathered edge instead of ink, so overlapping puffs merge
- * into one cloud. Like `Motes` they are written each frame from the time alone; fade a puff in and out with `a`.
+ * into one cloud, and veil the ink lines behind them. Like `Motes` they are written each frame from the time alone;
+ * fade a puff in and out with `a`.
  */
 export class Puffs {
   group = new THREE.Group();
@@ -171,7 +172,7 @@ export class Puffs {
     this.geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     this.geo.setAttribute('iSA', new THREE.InstancedBufferAttribute(this.sa, 3).setUsage(THREE.DynamicDrawUsage));
     const mesh = new THREE.Mesh(this.geo, new THREE.ShaderMaterial({
-      uniforms: { ...G, uCol: { value: new THREE.Color(color) } },
+      uniforms: { ...G, uCol: { value: new THREE.Color(color) }, uVeil: { value: 0 } },
       transparent: true, depthWrite: false,
       vertexShader: /* glsl */ `
         attribute vec3 iPos, iSA; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
@@ -182,7 +183,7 @@ export class Puffs {
         }`,
       fragmentShader: /* glsl */ `
         ${COMMON}
-        uniform vec3 uCol; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
+        uniform vec3 uCol; uniform float uVeil; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
         void main(){
           float an = atan(vP.y, vP.x), s = vSeed*6.283;
           float e = length(vP)/(.8 + .07*sin(an*5. + s) + .05*sin(an*9. - s*2.) + .04*(vnoise(vP*3. + s) - .5));
@@ -192,7 +193,7 @@ export class Puffs {
           vec3 lit = uCol*(.6 + .5*uLightCol), shade = uCol*mix(uShadow, vec3(1.), .62)*(.62 + .3*uLightCol);
           vec3 col = mix(shade, lit, smoothstep(-.3, -.05, nl)) * (1. - .25*uNight) * (1. - .14*smoothstep(.7, .9, e));
           float a = vA*(1. - smoothstep(.82, 1., e));
-          gl_FragColor = vec4(applyFog(col, length(cameraPosition - vW)), a);
+          gl_FragColor = uVeil > .5 ? vec4(vec3(-(viewMatrix*vec4(vW, 1.)).z), a) : vec4(applyFog(col, length(cameraPosition - vW)), a);
         }`,
     }));
     mesh.frustumCulled = false;

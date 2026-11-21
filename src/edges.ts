@@ -6,6 +6,8 @@ import { G, INK } from './toon';
  * Screen-space ink: lines from depth discontinuities and normal creases of an opaque depth/normal pass.
  * Skip an object (and its children) with `userData.noEdge = true`; transparent, additive, sprite, line and point
  * objects are always skipped. Meshes whose material has `defines.SWAY` or `FADE` (foliage) get lighter lines.
+ * A see-through mesh veils the lines and haze behind it if its material has a `uVeil` uniform and, while that is 1,
+ * draws its linear view depth in rgb and its coverage in alpha (see `Puffs`).
  */
 export interface EdgeOpts {
   /** overall line opacity, 0 to 1 */
@@ -104,7 +106,7 @@ void main(){
 
 const EDGE = {
   uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null }, tData: { value: null as THREE.Texture | null },
+    tDiffuse: { value: null as THREE.Texture | null }, tData: { value: null as THREE.Texture | null }, tVeil: { value: null as THREE.Texture | null },
     uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uPx: { value: 1.1 }, uStrength: { value: 0.85 }, uDepthK: { value: 0.04 }, uNormK: { value: 0.55 },
     uFade: { value: new THREE.Vector2(260, 1500) }, uFol: { value: 0.5 }, uEdges: { value: 1 },
     uTan: { value: new THREE.Vector2(1, 1) }, uCamW: { value: new THREE.Matrix4() },
@@ -113,7 +115,7 @@ const EDGE = {
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse, tData; uniform vec2 uTexel, uFade, uTan, uHazeR; uniform float uPx, uStrength, uDepthK, uNormK, uFol, uEdges, uNight, uHazeK, uHazeMix, uNearSat, uFogTop, uFogK, uFogFall;
+    uniform sampler2D tDiffuse, tData, tVeil; uniform vec2 uTexel, uFade, uTan, uHazeR; uniform float uPx, uStrength, uDepthK, uNormK, uFol, uEdges, uNight, uHazeK, uHazeMix, uNearSat, uFogTop, uFogK, uFogFall;
     uniform vec3 uInk, uFog, uHazeTint; uniform mat4 uCamW; varying vec2 vUv;
     vec3 nrm(vec4 d){ return vec3(d.xy, sqrt(max(0., 1.-dot(d.xy,d.xy)))); }
     float inv(vec4 d){ return d.w > 0. ? 1./d.w : 0.; }
@@ -122,13 +124,15 @@ const EDGE = {
       vec4 c = texture2D(tData, vUv);
       if (c.w <= 0.) { gl_FragColor = vec4(col, 1.); return; }
       float z = c.w;
+      vec4 vl = texture2D(tVeil, vUv);
+      float veil = vl.a > 0. ? vl.a*step(vl.r/vl.a, z) : 0.;
       vec3 wp = (uCamW*vec4((vUv*2.-1.)*uTan*z, -z, 1.)).xyz;
       float sat = 1.+uNearSat*(1.-smoothstep(uHazeR.x*.5, uHazeR.y*.5, z));
       col = mix(vec3(dot(col, vec3(.299,.587,.114))), col, sat);
       vec3 hc = mix(uFog, uHazeTint, uHazeMix);
       float hz = uHazeK*smoothstep(uHazeR.x, uHazeR.y, z);
       float gf = uFogK*(1.-smoothstep(uFogTop-uFogFall, uFogTop, wp.y))*(1.-exp(-z*.004));
-      col = mix(col, hc, clamp(hz+gf, 0., .92));
+      col = mix(col, hc, clamp(hz+gf, 0., .92)*(1.-veil));
       if (uEdges > 0.) {
         vec2 o = uTexel*uPx;
         vec4 l = texture2D(tData, vUv-vec2(o.x,0.)), r = texture2D(tData, vUv+vec2(o.x,0.)), d = texture2D(tData, vUv-vec2(0.,o.y)), u = texture2D(tData, vUv+vec2(0.,o.y));
@@ -148,7 +152,7 @@ const EDGE = {
         w *= (1.-t*t*(3.-2.*t))*uStrength;
         vec3 ink = mix(uInk*vec3(1.5,1.2,1.)+vec3(.05,.03,.02), uInk*vec3(.9,1.1,1.8), uNight);
         ink = mix(col*.38, ink, .55);
-        col = mix(col, ink, w);
+        col = mix(col, ink, w*(1.-veil));
       }
       gl_FragColor = vec4(col, 1.);
     }`,
@@ -162,6 +166,8 @@ interface Item { o: THREE.Mesh; mat: THREE.Material | THREE.Material[] }
  */
 export class EdgePass extends Pass {
   private target = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  private veil = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  private veils: THREE.Mesh[] = [];
   private quad: FullScreenQuad;
   private mat: THREE.ShaderMaterial;
   private derived = new WeakMap<THREE.Material, THREE.Material>();
@@ -183,6 +189,7 @@ export class EdgePass extends Pass {
 
   setSize(w: number, h: number) {
     this.target.setSize(w, h);
+    this.veil.setSize(w, h);
     this.mat.uniforms.uTexel.value.set(1 / w, 1 / h);
     this.mat.uniforms.uPx.value = edgePx(this.opts.thickness, h);
   }
@@ -206,7 +213,7 @@ export class EdgePass extends Pass {
 
   /** Collect what the depth pass draws and hide the hull outlines. Call once per frame before the composer renders. */
   scan() {
-    this.swaps.length = 0; this.hidden.length = 0;
+    this.swaps.length = 0; this.hidden.length = 0; this.veils.length = 0;
     const walk = (o: THREE.Object3D) => {
       if (!o.visible) return;
       if (o.userData.noEdge) { this.hidden.push(o); return; }
@@ -215,7 +222,10 @@ export class EdgePass extends Pass {
         if (!this.opts.hulls) { o.visible = false; this.hulls.push(o); }
         return;
       }
-      if (this.skipped(o)) { if ((o as THREE.Mesh).isMesh || (o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || (o as THREE.Line).isLine) this.hidden.push(o); }
+      if (this.skipped(o)) {
+        if ((o as THREE.Mesh).isMesh || (o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || (o as THREE.Line).isLine) this.hidden.push(o);
+        if (mesh.isMesh && m?.uniforms?.uVeil) this.veils.push(mesh);
+      }
       else this.swaps.push({ o: mesh, mat: mesh.material });
       for (const c of o.children) walk(c);
     };
@@ -244,6 +254,15 @@ export class EdgePass extends Pass {
       renderer.setClearColor(0x000000, 0);
       renderer.autoClear = true;
       renderer.render(this.scene, cam);
+      renderer.setRenderTarget(this.veil);
+      renderer.clear();
+      renderer.autoClear = false;
+      for (const v of this.veils) {
+        const k = (v.material as THREE.ShaderMaterial).uniforms.uVeil;
+        v.visible = true; k.value = 1;
+        renderer.render(v, cam);
+        k.value = 0;
+      }
     } finally {
       renderer.autoClear = prevAuto; renderer.setClearColor(prevClear, prevAlpha); renderer.setRenderTarget(prevTarget);
       this.scene.background = prevBg; this.scene.fog = prevFog;
@@ -253,9 +272,10 @@ export class EdgePass extends Pass {
 
     u.tDiffuse.value = readBuffer.texture;
     u.tData.value = this.target.texture;
+    u.tVeil.value = this.veil.texture;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.quad.render(renderer);
   }
 
-  dispose() { this.target.dispose(); this.mat.dispose(); this.quad.dispose(); }
+  dispose() { this.target.dispose(); this.veil.dispose(); this.mat.dispose(); this.quad.dispose(); }
 }
