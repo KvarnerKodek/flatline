@@ -388,7 +388,7 @@ export function figure(o: FigureOpts = {}): Figure {
         a.thumb.rotation.set(a.s * 0.35, 0, (face ? -0.1 : 0.45) + curl * 0.6);
         if (mixK >= 1) { reachTo(a, grip!, face); return; }
         a.sh.rotation.set(R ? reach : -reach, 0, armA + counter + breath * 0.02 * life);
-        a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA));
+        a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA) - (dress ? 0.3 * (1 - Math.min(1, Math.max(0, armA))) : 0));
         const elbow = (R ? p.elbowR : p.elbowL) ?? (0.18 + 0.32 * Math.min(1, Math.max(0, armA) / 2.2) + Math.max(0, Math.sin(ph(i))) * st * 0.5 + 0.03 * Math.sin(t * 0.9 + seed + i) * life);
         a.el.rotation.set(0, 0, elbow);
         a.wr.rotation.set(0, 0, -0.1 - elbow * 0.15);
