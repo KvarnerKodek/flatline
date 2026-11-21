@@ -27,7 +27,7 @@ const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>();
 function noiseBuffer(ctx: BaseAudioContext) {
   let b = noiseBuffers.get(ctx);
   if (b) return b;
-  b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  b = ctx.createBuffer(1, ctx.sampleRate * 8, ctx.sampleRate);
   const d = b.getChannelData(0);
   let x = 1;
   for (let i = 0; i < d.length; i++) d[i] = (x = (x * 16807) % 2147483647) / 1073741823.5 - 1;
@@ -90,7 +90,7 @@ export function voice(ctx: BaseAudioContext, dest: AudioNode, c: Cue, at: number
       s.buffer = noiseBuffer(ctx); s.loop = true;
       band.type = 'bandpass'; band.Q.value = 0.9;
       band.frequency.setValueAtTime(c.f ?? 800, at); band.frequency.exponentialRampToValueAtTime(c.f2 ?? c.f ?? 800, at + d);
-      s.connect(band); band.connect(g); s.start(at); s.stop(at + d + 0.1);
+      s.connect(band); band.connect(g); s.start(at, (c.t * 3.7) % 6); s.stop(at + d + 0.1);
       g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(v, at + d * 0.7); g.gain.linearRampToValueAtTime(0.0001, at + d);
       break;
     }
