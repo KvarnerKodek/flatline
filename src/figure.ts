@@ -429,9 +429,9 @@ export function figure(o: FigureOpts = {}): Figure {
       });
       if (feather) feather.rotation.set(0, 0, Math.sin(w * 2 - 0.8) * st * 0.25 + Math.sin(t * 2.1 + seed) * 0.05 * life);
 
-      mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1);
+      mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1 + 0.18 * joy - 0.15 * Math.max(0, -mood));
       grin.visible = joy > 0.01;
-      grin.scale.set(1, joy, 0.4 + 0.6 * joy);
+      grin.scale.set(1, joy, (0.4 + 0.6 * joy) * (1 + 0.18 * joy));
       brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.5 * Math.max(0, -mood); br.position.y = 0.072 + 0.012 * Math.abs(mood); });
     },
   };
