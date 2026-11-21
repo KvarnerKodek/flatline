@@ -37,11 +37,11 @@ export class Backings {
     return sprite;
   }
 
-  /** Parents each backing beside its sprite and shows it only while the sprite is visible and not shrunk to nothing. */
+  /** Parents each backing beside its sprite and shows it only while the sprite is visible, not shrunk to nothing and not faded out. */
   sync() {
     for (const { sprite, plane } of this.items) {
       if (!plane.parent) sprite.parent?.add(plane);
-      plane.visible = sprite.visible && sprite.scale.x > 0.05;
+      plane.visible = sprite.visible && sprite.scale.x > 0.05 && sprite.material.opacity > 0.05;
     }
   }
 }

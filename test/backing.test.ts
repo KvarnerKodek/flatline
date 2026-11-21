@@ -44,3 +44,17 @@ describe('backing planes', () => {
     expect(plane.visible).toBe(false);
   });
 });
+
+describe('backing of a faded sprite', () => {
+  it('hides with the sprite fade so ink lines return behind a card that is not drawn', () => {
+    const scene = new THREE.Scene(), sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true })), b = new Backings();
+    sprite.scale.set(5, 3, 1);
+    scene.add(b.add(sprite));
+    b.sync();
+    const plane = scene.children[1] as THREE.Mesh;
+    expect(plane.visible).toBe(true);
+    sprite.material.opacity = 0.02;
+    b.sync();
+    expect(plane.visible).toBe(false);
+  });
+});

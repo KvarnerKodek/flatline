@@ -40,3 +40,19 @@ describe('pinned labels', () => {
     expect(new THREE.Vector3(0, 1, 0).transformDirection(l.matrixWorld).y).toBeCloseTo(1, 6);
   });
 });
+
+describe('pinned label quality', () => {
+  it('samples the texture with anisotropy so oblique cards stay crisp', () => {
+    const t = new THREE.Texture();
+    pinned(t, { width: 2 });
+    expect(t.anisotropy).toBeGreaterThanOrEqual(8);
+  });
+  it('faces along a vertical normal without degenerating', () => {
+    const l = pinned(new THREE.Texture(), { width: 2 });
+    pinTo(l, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+    l.updateMatrixWorld();
+    const n = new THREE.Vector3(0, 0, 1).transformDirection(l.matrixWorld);
+    expect(n.y).toBeCloseTo(1, 6);
+    expect(Number.isNaN(l.quaternion.x)).toBe(false);
+  });
+});
