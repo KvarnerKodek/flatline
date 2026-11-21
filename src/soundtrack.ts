@@ -1,6 +1,14 @@
 import { renderScore, renderScoreAsync, wav, wavBase64, type Score } from './score';
 
-/** What the player needs from a film's sound: `Soundtrack` plays a `Score`, `CuePlayer` plays WebAudio cues. */
+type Stereo = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
+
+/** Decodes a recorded track (any format the browser plays) to stereo samples at `rate`; a mono file plays on both sides. */
+async function decodeTrack(url: string, rate: number): Promise<Stereo> {
+  const buf = await new OfflineAudioContext(2, 1, rate).decodeAudioData(await (await fetch(url)).arrayBuffer());
+  return [buf.getChannelData(0), buf.getChannelData(Math.min(1, buf.numberOfChannels - 1))] as Stereo;
+}
+
+/** What the player needs from a film's sound: `Soundtrack` plays a `Score` or a recorded track, `CuePlayer` plays WebAudio cues. */
 export interface Sound {
   on: boolean;
   prepare(): void;
@@ -12,7 +20,7 @@ export interface Sound {
 }
 
 /**
- * Plays a film's score in the page. The score renders in the background from `prepare`, and plays once the viewer
+ * Plays a film's score, or a recorded track given by URL, in the page. The score renders in the background from `prepare`, and plays once the viewer
  * turns sound on (browsers allow sound only after a click). While it plays, the audio clock leads and film time follows it, so picture and sound never drift;
  * a seek or pause simply restarts the sound at the film's time.
  */
@@ -23,13 +31,13 @@ export class Soundtrack implements Sound {
   private src?: AudioBufferSourceNode;
   private startedAt = 0;
   private from = 0;
-  private samples?: Promise<[Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>]>;
+  private samples?: Promise<Stereo>;
 
-  constructor(private score: Score, private rate = 32000) {}
+  constructor(private source: Score | string, private rate = 32000) {}
 
   /** Starts rendering in a background worker, so sound is ready by the time the viewer asks for it and playback never stutters. */
   prepare() {
-    this.samples ??= renderScoreAsync(this.score, this.rate);
+    this.samples ??= typeof this.source === 'string' ? decodeTrack(this.source, this.rate) : renderScoreAsync(this.source, this.rate);
   }
 
   /** Turns sound on or off; the first time, the score renders in the background and `ready` runs when it can be heard. */
@@ -73,9 +81,9 @@ export class Soundtrack implements Sound {
     this.src = undefined;
   }
 
-  /** The whole score as a base64 WAV, for the video renderer to mux in. */
-  wavBase64(): string {
-    const [l, r] = renderScore(this.score, 48000);
+  /** The whole score or track as a base64 WAV, for the video renderer to mux in. */
+  async wavBase64(): Promise<string> {
+    const [l, r] = typeof this.source === 'string' ? await decodeTrack(this.source, 48000) : renderScore(this.source, 48000);
     return wavBase64(wav(l, r, 48000));
   }
 }

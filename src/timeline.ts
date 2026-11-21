@@ -64,7 +64,7 @@ export interface Film<W> {
   warp?(t: number): number;
   /** The film's music, written as notes; the player plays it in sync and the renderer muxes it into the video. */
   score?(): Score;
-  /** Another way to supply sound, such as `new CuePlayer(generateCues(spec), duration)`; wins over `score`. */
+  /** Another way to supply sound, such as `new Soundtrack(trackUrl)` for a recorded track or `new CuePlayer(generateCues(spec), duration)`; wins over `score`. */
   sound?(): Sound;
   /** Sun shadows to draw before each frame; aim them from `frame`. */
   sun?(world: W): SunShadow;
