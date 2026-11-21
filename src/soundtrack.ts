@@ -87,3 +87,35 @@ export class Soundtrack implements Sound {
     return wavBase64(wav(l, r, 48000));
   }
 }
+
+/** Plays several sounds at once, such as a recorded track under sound effects; the first leads the film's clock and the rest follow it. */
+export class Mix implements Sound {
+  constructor(private parts: Sound[]) {}
+
+  get on() { return this.parts[0].on; }
+
+  prepare() { this.parts.forEach((p) => p.prepare()); }
+
+  enable(on: boolean, ready?: () => void) {
+    let waiting = this.parts.length;
+    this.parts.forEach((p) => p.enable(on, () => { if (--waiting === 0) ready?.(); }));
+  }
+
+  sync(t: number, playing: boolean): number {
+    const heard = this.parts[0].sync(t, playing);
+    for (const p of this.parts.slice(1)) p.sync(heard, playing);
+    return heard;
+  }
+
+  async wavBase64(): Promise<string> {
+    const ctx = new OfflineAudioContext(2, 1, 48000);
+    const mixed = await Promise.all(this.parts.map(async (p) => {
+      const bytes = Uint8Array.from(atob(await p.wavBase64()), (c) => c.charCodeAt(0));
+      const buf = await ctx.decodeAudioData(bytes.buffer);
+      return [buf.getChannelData(0), buf.getChannelData(Math.min(1, buf.numberOfChannels - 1))];
+    }));
+    const n = Math.max(...mixed.map(([l]) => l.length)), L = new Float32Array(n), R = new Float32Array(n);
+    for (const [l, r] of mixed) for (let i = 0; i < l.length; i++) { L[i] += l[i]; R[i] += r[i]; }
+    return wavBase64(wav(L, R, 48000));
+  }
+}
