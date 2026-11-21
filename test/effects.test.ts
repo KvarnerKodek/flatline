@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Butterflies, flutter } from '../src/butterflies';
 import { Burst, Fireworks, FireworkOpts, sparkAt, sparksPerBurst } from '../src/fireworks';
 import { Smoke, puffAt } from '../src/smoke';
+import { Puffs } from '../src/motes';
 
 const smokeOpts = { per: 7, color: 0, rate: 0.16, radius: [0.5, 2.9] as [number, number], rise: 15, lean: 9, wobble: 1 };
 const fw: Required<FireworkOpts> = { colors: [1], hot: [2, 3], rays: 40, trail: 4, life: 2.2, rise: 0.7, climb: 60, sag: 14, size: 3.2 };
@@ -23,6 +24,30 @@ describe('smoke', () => {
     const a = [...(s.group.children[0].children[0] as THREE.InstancedMesh).instanceMatrix.array];
     s.update(9); s.update(5);
     expect([...(s.group.children[0].children[0] as THREE.InstancedMesh).instanceMatrix.array]).toEqual(a);
+  });
+});
+
+describe('puffs', () => {
+  const geo = (p: Puffs) => (p.group.children[0] as THREE.Mesh).geometry as THREE.InstancedBufferGeometry;
+  const shape = (p: Puffs, n: number) => {
+    const g = geo(p);
+    return Array.from({ length: g.instanceCount }, (_, i) => [...g.getAttribute('iSA').array.slice(i * 3, i * 3 + 3)]).slice(-n);
+  };
+  it('keep each puff\'s outline with its seed, so puffs born or faded out ahead of it never reshape it', () => {
+    const p = new Puffs(8);
+    p.begin(); p.add(0, 0, 0, 1, 1, 3); p.add(0, 1, 0, 2, 0.5, 4); p.end();
+    const before = shape(p, 2);
+    p.begin(); p.add(0, 0, 0, 1, 0, 9); p.add(5, 5, 5, 1, 1, 2); p.add(0, 0, 0, 1, 1, 3); p.add(0, 1, 0, 2, 0.5, 4); p.end();
+    expect(shape(p, 2)).toEqual(before);
+    expect(geo(p).instanceCount).toBe(3);
+  });
+  it('hide when empty and drop puffs past their budget', () => {
+    const p = new Puffs(2);
+    p.begin(); p.end();
+    expect(p.group.visible).toBe(false);
+    p.begin(); for (let i = 0; i < 5; i++) p.add(i, 0, 0, 1, 1, i); p.end();
+    expect(p.group.visible).toBe(true);
+    expect(geo(p).instanceCount).toBe(2);
   });
 });
 

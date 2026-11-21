@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import { G, toon } from './toon';
-import { outlineI } from './instanced';
+import { COMMON, G } from './toon';
 
 /**
  * A cloud of glowing points a film places itself: fireflies, sparks, coins, lanterns, snow. The film writes
@@ -151,40 +150,71 @@ export class Arc {
 }
 
 /**
- * Soft inked blobs a film places itself: chimney smoke, engine steam, dust. Like `Motes` they are written each
- * frame from the time alone, but they are lit and outlined, so they read against a bright sky.
+ * Soft billowing puffs a film places itself: engine steam, chimney smoke, dust. Each puff is a camera-facing lobed blob
+ * with a sunlit top, a lavender cel shadow underneath and a feathered edge instead of ink, so overlapping puffs merge
+ * into one cloud. Like `Motes` they are written each frame from the time alone; fade a puff in and out with `a`.
  */
 export class Puffs {
   group = new THREE.Group();
-  private body: THREE.InstancedMesh;
-  private ink: THREE.InstancedMesh;
-  private m = new THREE.Matrix4();
-  private q = new THREE.Quaternion();
-  private p = new THREE.Vector3();
-  private s = new THREE.Vector3();
+  private pos: Float32Array;
+  private sa: Float32Array;
+  private geo = new THREE.InstancedBufferGeometry();
   private n = 0;
 
-  /** All puffs are one instanced mesh, so a chimney full of smoke is a single draw. */
-  constructor(private max: number, color = 0xffffff, ink = 1.4) {
-    const g = new THREE.IcosahedronGeometry(1, 2);
-    this.body = new THREE.InstancedMesh(g, toon({ color, spec: 0, emissive: color, emisAmt: 0.22 }), max);
-    this.ink = new THREE.InstancedMesh(g, outlineI(ink), max);
-    for (const m of [this.body, this.ink]) { m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
-    this.group.add(this.body, this.ink);
+  /** All puffs are one instanced quad, so a chimney full of smoke is a single draw. */
+  constructor(private max: number, color = 0xffffff) {
+    this.pos = new Float32Array(max * 3);
+    this.sa = new Float32Array(max * 3);
+    const q = new THREE.PlaneGeometry(2, 2);
+    this.geo.index = q.index;
+    this.geo.setAttribute('position', q.getAttribute('position'));
+    this.geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geo.setAttribute('iSA', new THREE.InstancedBufferAttribute(this.sa, 3).setUsage(THREE.DynamicDrawUsage));
+    const mesh = new THREE.Mesh(this.geo, new THREE.ShaderMaterial({
+      uniforms: { ...G, uCol: { value: new THREE.Color(color) } },
+      transparent: true, depthWrite: false,
+      vertexShader: /* glsl */ `
+        attribute vec3 iPos, iSA; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
+        void main(){
+          vP = position.xy; vA = iSA.y; vSeed = iSA.z; vW = iPos;
+          vec3 r = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), u = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+          gl_Position = projectionMatrix*viewMatrix*vec4(iPos + (r*position.x + u*position.y)*iSA.x*1.25, 1.);
+        }`,
+      fragmentShader: /* glsl */ `
+        ${COMMON}
+        uniform vec3 uCol; varying vec2 vP; varying vec3 vW; varying float vA, vSeed;
+        void main(){
+          float an = atan(vP.y, vP.x), s = vSeed*6.283;
+          float e = length(vP)/(.8 + .07*sin(an*5. + s) + .05*sin(an*9. - s*2.) + .04*(vnoise(vP*3. + s) - .5));
+          if (e > 1.) discard;
+          vec3 n = normalize(vec3(vP, sqrt(max(0., 1. - e*e)))), l = normalize((viewMatrix*vec4(uLightDir, 0.)).xyz);
+          float nl = dot(n, l) + (vnoise(vP*2.5 - s) - .5)*.3;
+          vec3 lit = uCol*(.6 + .5*uLightCol), shade = uCol*mix(uShadow, vec3(1.), .62)*(.62 + .3*uLightCol);
+          vec3 col = mix(shade, lit, smoothstep(-.3, -.05, nl)) * (1. - .25*uNight) * (1. - .14*smoothstep(.7, .9, e));
+          float a = vA*(1. - smoothstep(.82, 1., e));
+          gl_FragColor = vec4(applyFog(col, length(cameraPosition - vW)), a);
+        }`,
+    }));
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 7;
+    this.group.add(mesh);
     this.group.visible = false;
   }
 
   begin() { this.n = 0; }
 
-  add(x: number, y: number, z: number, size: number) {
-    if (this.n >= this.max || size <= 0.01) return;
-    this.m.compose(this.p.set(x, y, z), this.q, this.s.set(size, size * 0.82, size));
-    this.body.setMatrixAt(this.n, this.m);
-    this.ink.setMatrixAt(this.n++, this.m);
+  /** Adds one puff of radius `size` metres and opacity `a`; `seed` picks its outline, so keep it fixed for a puff's life. Puffs past `max` are dropped. */
+  add(x: number, y: number, z: number, size: number, a = 1, seed = 0) {
+    if (this.n >= this.max || size <= 0.01 || a <= 0.003) return;
+    const i = this.n++;
+    this.pos.set([x, y, z], i * 3);
+    this.sa.set([size, Math.min(1, a), (((seed * 0.618034) % 1) + 1) % 1], i * 3);
   }
 
   end() {
-    for (const m of [this.body, this.ink]) { m.count = this.n; m.instanceMatrix.needsUpdate = true; }
+    this.geo.instanceCount = this.n;
+    this.geo.getAttribute('iPos').needsUpdate = true;
+    this.geo.getAttribute('iSA').needsUpdate = true;
     this.group.visible = this.n > 0;
   }
 }
