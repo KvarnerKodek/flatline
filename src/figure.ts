@@ -243,6 +243,7 @@ export function figure(o: FigureOpts = {}): Figure {
   }
   face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.2, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.232, -0.028, 0);
   const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.216, -0.095, 0);
+  const grin = face(new THREE.SphereGeometry(0.03, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.3, 0.62, 1), 0x5a1a16, 0.212, -0.089, 0);
   let feather: THREE.Group | undefined;
   if (o.hat !== undefined && o.tyrolean) {
     part(head, new THREE.CylinderGeometry(0.33, 0.34, 0.03, 20).rotateZ(-0.06), o.hat, 0, 0.17, 0);
@@ -394,6 +395,9 @@ export function figure(o: FigureOpts = {}): Figure {
 
       const mood = p.mood ?? 0.6;
       mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1);
+      const open = smooth01((mood - 0.65) / 0.35);
+      grin.visible = open > 0.01;
+      grin.scale.set(1, open, 0.4 + 0.6 * open);
       brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.5 * Math.max(0, -mood); br.position.y = 0.072 + 0.012 * Math.abs(mood); });
     },
   };
