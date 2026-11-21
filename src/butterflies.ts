@@ -51,9 +51,9 @@ export class Butterflies {
   update(t: number, focus: THREE.Vector3, vis = 1, cam?: THREE.Vector3) {
     const { count, height, bob, size, keepOut, span, drift } = this.o;
     for (let i = 0; i < count; i++) {
-      const p = flutter(i, t, focus, { span, drift }), near = cam ? ss(keepOut[0], keepOut[1], Math.hypot(p.x - cam.x, p.z - cam.z)) : 1;
+      const p = flutter(i, t, focus, { span, drift }), q = flutter(i, t + 0.05, focus, { span, drift }), near = cam ? ss(keepOut[0], keepOut[1], Math.hypot(p.x - cam.x, p.z - cam.z)) : 1;
       const k = vis * p.fade * near * 1.4 * size, y = this.ground(p.x, p.z) + height + bob * Math.sin(t * 1.9 + i * 1.7);
-      this.flock.set(i, p.x, y, p.z, t * 0.8 + i, k, k * (0.5 + 0.9 * Math.abs(Math.sin(t * 13 + i * 3))), k);
+      this.flock.set(i, p.x, y, p.z, -Math.atan2(q.z - p.z, q.x - p.x), k, k * (0.5 + 0.9 * Math.abs(Math.sin(t * 13 + i * 3))), k);
     }
     this.flock.commit();
   }

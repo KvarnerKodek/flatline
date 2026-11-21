@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { G, toon, outline } from './toon';
-import { sealRig } from './rig';
+import { sealRig, taperedLimb as limb } from './rig';
+import { blink, eyeDart, pathLength, squashStretch, travelYaw, weightShift } from './motion';
+import { ss } from './timeline';
 
 const INK = outline(1.7);
 const mats = new Map<number, THREE.ShaderMaterial>();
@@ -27,11 +29,11 @@ function shadow(parent: THREE.Object3D, rx: number, rz: number) {
 /**
  * `outfit` dresses the figure in alpine costume: a `dirndl` (bodice in `coat`, white blouse, full skirt in `skirt`, apron) or
  * `lederhosen` (white shirt, braces, leather shorts, knee socks). `tyrolean` turns the hat into a felt hat with band and
- * feather. `hairStyle` adds `braids` or a `bun` behind the head.
+ * feather. `hairStyle` adds `braids`, a `bun` or a swinging `ponytail` behind the head.
  */
 export interface FigureOpts {
   skin?: number; coat?: number; legs?: number; hair?: number; hat?: number; scarf?: number; dress?: boolean; apron?: number; build?: number;
-  outfit?: 'dirndl' | 'lederhosen'; skirt?: number; tyrolean?: boolean; hairStyle?: 'braids' | 'bun';
+  outfit?: 'dirndl' | 'lederhosen'; skirt?: number; tyrolean?: boolean; hairStyle?: 'braids' | 'bun' | 'ponytail';
 }
 /**
  * How a figure stands and moves. Every field is optional and the defaults are a relaxed, breathing idle.
@@ -54,11 +56,42 @@ export interface FigureOpts {
 export interface FigurePose {
   walk?: number; stride?: number; armL?: number; armR?: number; reachL?: number; reachR?: number; headYaw?: number; headPitch?: number; bow?: number; mood?: number;
   elbowL?: number; elbowR?: number; gripL?: THREE.Vector3 | null; gripR?: THREE.Vector3 | null; gripMixL?: number; gripMixR?: number; palmL?: THREE.Vector3 | null; palmR?: THREE.Vector3 | null; curlL?: number; curlR?: number; t?: number; idle?: number;
+  face?: FaceName; blush?: number; open?: number; brow?: number; gaze?: THREE.Vector3 | null; squash?: number; lift?: number;
+  drag?: { yaw: [number, number]; bow: [number, number] };
 }
+
+/** Face presets: `mood` (-1 frown to 1 smile), `brow` (-1 lowered and angry to 1 raised), `open` mouth, `blush` and `wide` eyes. */
+export const FACES = {
+  neutral: { mood: 0.6, brow: 0, open: 0, blush: 0.3, wide: 0 },
+  joy: { mood: 1, brow: 0.3, open: 0.35, blush: 0.65, wide: 0 },
+  sad: { mood: -0.8, brow: 0.2, open: 0, blush: 0.15, wide: 0 },
+  worry: { mood: -0.4, brow: 0.5, open: 0.1, blush: 0.2, wide: 0.2 },
+  surprise: { mood: 0, brow: 1, open: 0.9, blush: 0.25, wide: 1 },
+  angry: { mood: -0.5, brow: -1, open: 0, blush: 0.4, wide: 0 },
+  shy: { mood: 0.5, brow: 0.2, open: 0, blush: 1, wide: 0 },
+  smirk: { mood: 0.3, brow: -0.2, open: 0, blush: 0.25, wide: 0 },
+} as const;
+export type FaceName = keyof typeof FACES;
+
+let BLUSH: THREE.CanvasTexture | undefined;
+const blushTexture = () => {
+  if (BLUSH) return BLUSH;
+  const c = document.createElement('canvas'), g = c.getContext('2d')!, r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  c.width = c.height = 64;
+  [[0, 0.95], [0.4, 0.5], [0.75, 0.14], [1, 0]].forEach(([k, a]) => r.addColorStop(k, `rgba(255,255,255,${a})`));
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  return (BLUSH = new THREE.CanvasTexture(c));
+};
 
 /** `hand` is the right palm (kept for older films); `handL`/`handR` are the palms, where props are attached. */
 export interface Figure {
   root: THREE.Group; hand: THREE.Object3D; handL: THREE.Object3D; handR: THREE.Object3D; pose(p: FigurePose): void;
+  /**
+   * Poses the figure from a pose function of time and adds the follow-through: loose hair, scarf tails and skirt trail the head and
+   * body turns, sampled from `fn` a little earlier (`lag` seconds) so each part behind lags the one before. Pure in `t`.
+   */
+  act(fn: (t: number) => FigurePose, t: number, lag?: number): void;
   /**
    * Holds `o` (attached anywhere on the figure) in both hands: whenever both arms are lifted forward and no grip is
    * given, the palms take its sides, `halfWidth` metres either side of its centre. Pass null to let go.
@@ -71,9 +104,10 @@ export interface Figure {
    */
   hold(hand: 'L' | 'R', prop: THREE.Object3D | null, offset?: THREE.Vector3): void;
   /** The skeleton, for films that need a joint: `legs[i].ankle`, `arms[i].wr` and so on (index 0 is left). */
-  joints: { pelvis: THREE.Group; spine: THREE.Group; neck: THREE.Group; head: THREE.Group; legs: { hip: THREE.Group; knee: THREE.Group; ankle: THREE.Group }[]; arms: { sh: THREE.Group; el: THREE.Group; wr: THREE.Group }[] };
+  joints: { pelvis: THREE.Group; spine: THREE.Group; neck: THREE.Group; head: THREE.Group; legs: { hip: THREE.Group; knee: THREE.Group; ankle: THREE.Group }[]; arms: { sh: THREE.Group; el: THREE.Group; wr: THREE.Group; fingers: THREE.Group; thumb: THREE.Group }[] };
 }
 
+const FINGERS: [z: number, tip: number, radius: number][] = [[-0.0315, 0.02, 0.0098], [-0.0105, 0.024, 0.0102], [0.0105, 0.022, 0.0098], [0.0315, 0.016, 0.0088]];
 const UP = 0.38, FORE = 0.38, FOOT = 0.06, HIPS = 0.82, ARM_U = 0.26, ARM_F = 0.24, PALM = 0.065, DUTY = 0.58;
 /** Half the step length for a stride. */
 const gaitHalf = (stride: number) => 0.34 * Math.min(1.2, Math.max(0, stride)) / 0.5 * 0.5 * 1.2;
@@ -82,6 +116,31 @@ const gaitHalf = (stride: number) => 0.34 * Math.min(1.2, Math.max(0, stride)) /
  * (distance = walkSpeed(stride) * walk) and its stance feet stay planted on the ground with no sliding.
  */
 export const walkSpeed = (stride: number) => (2 * gaitHalf(stride)) / (DUTY * Math.PI * 2);
+
+export interface WalkAlongOpts {
+  /** Where the figure is at film time `t`. */
+  at: (t: number) => THREE.Vector3;
+  t: number;
+  /** Ground distance walked so far; measured from `at` when omitted. */
+  dist?: number;
+  stride?: number;
+  /** Everything else about the pose (arms, mood, ...). */
+  pose?: FigurePose;
+}
+
+/**
+ * Walks `fig` along a path: it stands on the path, faces its direction of travel (never backwards), its gait phase follows the distance
+ * walked so stance feet stay planted, and it eases to a standing idle where the path stops. Pure in `t`.
+ */
+export function walkAlong(fig: Figure, { at, t, dist, stride = 0.5, pose }: WalkAlongOpts) {
+  const a = at(t - 0.05), b = at(t + 0.05), speed = Math.hypot(b.x - a.x, b.z - a.z) / 0.1;
+  fig.root.position.copy(at(t));
+  fig.root.rotation.y = -travelYaw(at, t);
+  const turn = (u: number, v: number) => { const d = travelYaw(at, u) - travelYaw(at, v); return -Math.atan2(Math.sin(d), Math.cos(d)); };
+  const body = [turn(t, t - 0.1), turn(t - 0.1, t - 0.2)], drag = pose?.drag;
+  fig.pose({ ...pose, walk: (dist ?? pathLength(at, t)) / walkSpeed(stride), stride: stride * ss(0.05, 0.35, speed), t, drag: { yaw: [body[0] + (drag?.yaw[0] ?? 0), body[1] + (drag?.yaw[1] ?? 0)], bow: drag?.bow ?? [0, 0] } });
+}
+
 const fract = (x: number) => x - Math.floor(x);
 const smooth01 = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 const hash = (x: number) => fract(Math.sin(x * 127.1) * 43758.5453);
@@ -125,10 +184,10 @@ export function figure(o: FigureOpts = {}): Figure {
     knee.position.y = -UP;
     ankle.position.y = -FORE;
     pelvis.add(hip); hip.add(knee); knee.add(ankle);
-    part(hip, new THREE.CapsuleGeometry(0.088, UP - 0.06, 3, 10).translate(0, -UP / 2, 0), leder ? skin : legC);
+    part(hip, limb(0.1, 0.078, UP, 0.05), leder ? skin : legC);
     if (leder) part(hip, new THREE.CylinderGeometry(0.108, 0.112, 0.27, 12).translate(0, -0.1, 0), leather);
     part(knee, new THREE.SphereGeometry(0.082, 10, 8), leder ? skin : legC);
-    part(knee, new THREE.CapsuleGeometry(0.078, FORE - 0.08, 3, 10).translate(0, -FORE / 2, 0), legC);
+    part(knee, limb(0.078, 0.062, FORE - 0.04, 0.12), legC);
     part(knee, new THREE.CylinderGeometry(0.083, 0.088, 0.12, 10).translate(0, -FORE + 0.07, 0), boot);
     part(ankle, new THREE.CapsuleGeometry(0.074, 0.11, 3, 10).rotateZ(Math.PI / 2).scale(1, 0.78, 1).translate(0.05, -FOOT * 0.45, 0), boot);
     const sole = [-0.06, 0.05, 0.16].map((x) => { const m = new THREE.Object3D(); m.position.set(x, x === 0.05 ? -0.085 : -0.072, 0); ankle.add(m); return m; });
@@ -174,22 +233,28 @@ export function figure(o: FigureOpts = {}): Figure {
     el.position.y = -ARM_U;
     wr.position.y = -ARM_F;
     spine.add(sh); sh.add(el); el.add(wr);
-    part(sh, new THREE.SphereGeometry(dirndl ? 0.088 : 0.074, 14, 10).scale(1, dirndl ? 1.1 : 0.95, 1), sleeve);
-    part(sh, new THREE.CapsuleGeometry(0.066, ARM_U - 0.04, 3, 10).translate(0, -ARM_U / 2, 0), sleeve);
-    part(el, new THREE.SphereGeometry(0.06, 10, 8), sleeve);
-    part(el, new THREE.CapsuleGeometry(0.058, ARM_F - 0.06, 3, 10).translate(0, -ARM_F / 2, 0), sleeve);
-    part(el, new THREE.CylinderGeometry(0.062, 0.066, 0.05, 12).translate(0, -ARM_F + 0.04, 0), dirndl || leder ? shirt : coat);
-    part(wr, new THREE.CapsuleGeometry(0.024, 0.032, 4, 14).scale(0.7, 1, 1.85).translate(0.004, -0.036, 0), skin);
+    part(sh, new THREE.SphereGeometry(dirndl ? 0.088 : 0.075, 14, 10).scale(1, dirndl ? 1.1 : 0.95, 1), sleeve);
+    part(sh, limb(0.07, 0.052, ARM_U, 0.1, 0.94), sleeve);
+    part(el, new THREE.SphereGeometry(0.053, 10, 8), sleeve);
+    part(el, limb(0.053, 0.038, ARM_F - 0.038, 0.12, 0.92), sleeve);
+    part(el, new THREE.TorusGeometry(0.042, 0.011, 6, 14).rotateX(Math.PI / 2).translate(0, -ARM_F + 0.046, 0), dirndl || leder ? shirt : coat);
+    part(el, limb(0.028, 0.026, 0.05, 0, 0.88).translate(0, -ARM_F + 0.04, 0), skin);
+    part(wr, new THREE.SphereGeometry(1, 12, 8).scale(0.0165, 0.036, 0.034).translate(0.004, -0.032, 0), skin);
+    part(wr, new THREE.CapsuleGeometry(0.0165, 0.056, 3, 8).rotateX(Math.PI / 2).translate(0.004, -0.06, 0), skin);
+    part(wr, new THREE.SphereGeometry(0.019, 10, 8).scale(0.9, 1.3, 1).translate(0.004, -0.03, s * -0.027), skin);
     fingers.position.set(0.004, -0.064, 0);
     wr.add(fingers);
-    part(fingers, new THREE.CapsuleGeometry(0.0225, 0.026, 4, 14).scale(0.68, 1, 1.8).translate(0, -0.014, 0), skin);
+    for (const [z, len, r] of FINGERS) {
+      part(fingers, limb(r * 1.1, r, 0.024).translate(0, 0.004, z), skin);
+      part(tip, limb(r, r * 0.8, len).translate(0, 0.004, z), skin);
+    }
     tip.position.y = -0.034;
     fingers.add(tip);
-    part(tip, new THREE.CapsuleGeometry(0.0205, 0.016, 4, 14).scale(0.66, 1, 1.75).translate(0, -0.012, 0), skin);
-    thumb.position.set(0.012, -0.03, s * -0.036);
+    thumb.position.set(0.004, -0.03, s * -0.04);
     thumb.rotation.set(s * 0.35, 0, 0.45);
     wr.add(thumb);
-    part(thumb, new THREE.CapsuleGeometry(0.0135, 0.022, 4, 10).scale(0.85, 1, 1).translate(0, -0.02, 0), skin);
+    part(thumb, limb(0.0145, 0.0115, 0.026).translate(0, 0.005, 0), skin);
+    part(thumb, limb(0.0115, 0.0095, 0.018).translate(0.003, -0.026, 0), skin);
     palm.position.set(0.035, -PALM, 0);
     wr.add(palm);
     return { sh, el, wr, fingers, tip, thumb, palm, s };
@@ -232,7 +297,19 @@ export function figure(o: FigureOpts = {}): Figure {
     part(at, new THREE.SphereGeometry(0.03, 8, 6), o.scarf ?? 0xc8553d, 0, -0.13, 0);
   }
 
-  const brows: THREE.Mesh[] = [], eyes: THREE.Group[] = [];
+  const chain = (parent: THREE.Object3D, at: [number, number, number], segs: number, make: (seg: THREE.Group, k: number) => void) => {
+    let link: THREE.Object3D = parent;
+    return Array.from({ length: segs }, (_, k) => {
+      const g = new THREE.Group();
+      g.position.set(...(k ? ([0, -0.1, 0] as [number, number, number]) : at));
+      link.add(g);
+      make(g, k);
+      return (link = g) as THREE.Group;
+    });
+  };
+  const ponytail = o.hairStyle === 'ponytail' ? chain(head, [-0.2, 0.06, 0], 3, (g, k) => part(g, new THREE.SphereGeometry(0.075 - k * 0.014, 10, 8).scale(1, 1.5, 1), hair, 0, -0.06, 0)) : [];
+  const scarfTails = o.scarf !== undefined ? chain(spine, [-0.13, 0.64, 0.05], 2, (g, k) => part(g, new THREE.BoxGeometry(0.035, 0.13, 0.07 - k * 0.012).translate(0, -0.05, 0), o.scarf!)) : [];
+  const brows: THREE.Mesh[] = [], eyes: THREE.Group[] = [], blushes: THREE.Mesh[] = [];
   const face = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number, parent: THREE.Object3D = head) => { const m = new THREE.Mesh(g, mat(color)); m.position.set(x, y, z); parent.add(m); return m; };
   for (const s of [-1, 1]) {
     const e = new THREE.Group();
@@ -244,7 +321,11 @@ export function figure(o: FigureOpts = {}): Figure {
     eyes.push(e);
     brows.push(face(new THREE.TorusGeometry(0.05, 0.0095, 5, 12, Math.PI * 0.38).rotateZ(Math.PI * 0.31).translate(0, -0.05, 0).rotateY(Math.PI / 2), new THREE.Color(hair).lerp(new THREE.Color(0x1b0f00), 0.5).getHex(), 0.207, 0.072, s * 0.084));
     brows[brows.length - 1].rotation.y = -s * 0.37;
-    face(new THREE.SphereGeometry(0.036, 12, 8).scale(0.3, 0.7, 1), 0xf2958a, 0.2, -0.045, s * 0.125);
+    const cheek = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.07), new THREE.MeshBasicMaterial({ map: blushTexture(), color: 0xf2706a, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    cheek.position.set(0.19, -0.05, s * 0.115).setLength(0.2305);
+    cheek.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), cheek.position.clone().normalize());
+    head.add(cheek);
+    blushes.push(cheek);
   }
   face(new THREE.SphereGeometry(0.03, 12, 10).scale(1.3, 0.9, 0.9), new THREE.Color(skin).lerp(new THREE.Color(0xe07a6a), 0.2).getHex(), 0.214, -0.028, 0);
   const mouth = face(new THREE.TorusGeometry(0.035, 0.008, 4, 12, Math.PI * 0.8).rotateY(Math.PI / 2).rotateX(Math.PI + Math.PI * 0.1).translate(0, 0.02, 0), 0x7a2e22, 0.21, -0.095, 0);
@@ -272,10 +353,10 @@ export function figure(o: FigureOpts = {}): Figure {
     for (let i = 0; i < pos.count; i++) { at.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); if (at.y > 0.78 && at.y < 1.02) hipR = Math.max(hipR, Math.hypot(at.x, at.z)); }
   });
   /** How far a lowered arm swings out (beyond the usual slight tuck) so the hand hangs clear of the hips, coat or skirt. */
-  const hang = Math.max(Math.asin(Math.min(1, (hipR + 0.045 - 0.25 * b) / 0.5)), -0.06) + 0.06;
+  const hang = Math.max(Math.asin(Math.min(1, (hipR + 0.052 - 0.25 * b) / 0.5)), -0.06) + 0.06;
   sealRig(root);
 
-  const inv = new THREE.Matrix4(), basis = new THREE.Matrix4(), d = new THREE.Vector3(), perp = new THREE.Vector3(), upper = new THREE.Vector3();
+  const gazeAt = new THREE.Vector3(), inv = new THREE.Matrix4(), basis = new THREE.Matrix4(), d = new THREE.Vector3(), perp = new THREE.Vector3(), upper = new THREE.Vector3();
   const elbowAt = new THREE.Vector3(), fd = new THREE.Vector3(), X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), pole = new THREE.Vector3();
   const WRIST = -Math.atan2(0.035, PALM), REACH = ARM_F + Math.hypot(0.035, PALM);
   const qHand = new THREE.Quaternion(), qOwn = new THREE.Quaternion(), wristAt = new THREE.Vector3();
@@ -322,7 +403,7 @@ export function figure(o: FigureOpts = {}): Figure {
   let carried: THREE.Object3D | null = null, carryHalf = 0.3;
   const heldBy: (THREE.Object3D | null)[] = [null, null];
   const side = new THREE.Vector3(), lateral = new THREE.Vector3(), gripAt = [new THREE.Vector3(), new THREE.Vector3()], mixAt = new THREE.Vector3();
-  return {
+  const self: Figure = {
     carry(o, halfWidth = 0.3) { carried = o; carryHalf = halfWidth; },
     hold(hand, prop, offset) {
       const i = hand === 'L' ? 0 : 1, palm = arms[i].palm;
@@ -332,6 +413,10 @@ export function figure(o: FigureOpts = {}): Figure {
       palm.add(prop);
       prop.position.copy(offset ?? new THREE.Vector3(0.012, -0.015, 0));
       prop.rotation.set(0, 0, 0);
+    },
+    act(fn, t, lag = 0.1) {
+      const c = fn(t), a = fn(t - lag), b = fn(t - 2 * lag), d = (k: 'headYaw' | 'bow'): [number, number] => [(c[k] ?? 0) - (a[k] ?? 0), (a[k] ?? 0) - (b[k] ?? 0)];
+      self.pose({ ...c, t: c.t ?? t, drag: c.drag ?? { yaw: d('headYaw'), bow: d('bow') } });
     },
     root, hand: arms[1].palm, handL: arms[0].palm, handR: arms[1].palm, joints: { pelvis, spine, neck, head, legs, arms },
     pose(p) {
@@ -372,14 +457,16 @@ export function figure(o: FigureOpts = {}): Figure {
       const toBody = inv.copy(body.matrixWorld).invert();
       for (const l of legs) for (const m of l.sole) lowest = Math.min(lowest, d.setFromMatrixPosition(m.matrixWorld).applyMatrix4(toBody).y);
       if (st < 0.01) body.position.y = -lowest;
+      body.position.y += p.lift ?? 0;
+      body.scale.set(...squashStretch(p.squash ?? 0));
 
       // Pelvis roll and the upper body: counter-twist, bow, breathing and a slow weight shift over planted feet.
-      const shift = Math.sin(t * 0.37 + seed) * 0.6 + Math.sin(t * 0.83 + seed * 2) * 0.4, breath = Math.sin(t * 1.7 + seed);
+      const shift = weightShift(t, seed), breath = Math.sin(t * 1.7 + seed);
       spine.rotation.set(-pelvis.rotation.x * 0.9 + shift * 0.035 * life, Math.sin(w) * st * 0.3, -(p.bow ?? 0) - st * 0.08);
       spine.position.set(0, 0, shift * 0.015 * life + Math.sin(w) * st * 0.035);
       spine.scale.set(1 + breath * 0.006 * life, 1 + breath * 0.012 * life, 1 + breath * 0.006 * life);
-      const skirt = pelvis.userData.skirt as THREE.Group | undefined;
-      if (skirt) { skirt.rotation.set(Math.sin(w - 0.9) * st * 0.12 + shift * 0.02 * life, 0, -Math.sin(w * 2 - 1.2) * st * 0.05); skirt.scale.set(1 + st * 0.05, 1, 1 + st * 0.05); }
+      const skirt = pelvis.userData.skirt as THREE.Group | undefined, yawD = p.drag?.yaw ?? [0, 0], bowD = p.drag?.bow ?? [0, 0];
+      if (skirt) { skirt.rotation.set(Math.sin(w - 0.9) * st * 0.12 + shift * 0.02 * life, -yawD[1] * 0.9, -Math.sin(w * 2 - 1.2) * st * 0.05 - bowD[1] * 0.4); skirt.scale.set(1 + st * 0.05, 1, 1 + st * 0.05); }
 
       // Arms: counter swing in a walk; a natural elbow bend unless a grip target asks for IK.
       const carrying = !!carried && !p.gripL && !p.gripR && (p.armL ?? 0) > 0.8 && (p.armR ?? 0) > 0.8;
@@ -414,27 +501,45 @@ export function figure(o: FigureOpts = {}): Figure {
       neck.rotation.set(-spine.rotation.x * 0.5, -spine.rotation.y * 0.7 + (p.headYaw ?? 0) * 0.35, (p.headPitch ?? 0) * 0.3);
       head.rotation.set(drift * 0.04, (p.headYaw ?? 0) * 0.65 + drift * 0.07, (p.headPitch ?? 0) * 0.7 + Math.sin(t * 0.71 + seed) * 0.03 * life + Math.sin(w * 2) * st * 0.03);
 
-      // Eyes: blinks every few seconds and small glances between fixations.
-      const period = 3.2, beat = t / period + hash(seed), k = Math.floor(beat), since = (fract(beat) - 0.35 * hash(k + seed)) * period;
-      const blink = since > 0 && since < 0.2 ? Math.sin((since / 0.2) * Math.PI) : 0;
-      const look = Math.floor(t * 0.9 + seed), gx = (hash(look) - 0.5) * 0.012 * (0.4 + still), gy = (hash(look + 3) - 0.5) * 0.008 * (0.4 + still);
-      const mood = p.mood ?? 0.6, joy = smooth01((mood - 0.65) / 0.35), squint = 0.2 * joy;
-      for (const e of eyes) { e.scale.set(1, (1 - 0.9 * blink) * (1 - squint), 1); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy - 0.024 * blink; e.children[1].visible = e.children[2].visible = blink < 0.5; }
+      // Eyes: blinks, darts between fixations, or follows `gaze` (the head turns part of the way, the eyes the rest).
+      const F = FACES[p.face ?? 'neutral'], mood = p.mood ?? F.mood, brow = p.brow ?? F.brow, open = p.open ?? F.open, joy = smooth01((mood - 0.65) / 0.35), squint = 0.2 * joy;
+      const lid = blink(t, seed), dart = eyeDart(t, seed), amp = 0.4 + still;
+      let gx = dart.x * 0.012 * amp, gy = dart.y * 0.008 * amp;
+      if (p.gaze) {
+        neck.updateWorldMatrix(true, false);
+        const local = neck.worldToLocal(gazeAt.copy(p.gaze));
+        head.rotation.y -= Math.max(-0.7, Math.min(0.7, Math.atan2(local.z, local.x))) * 0.55;
+        head.rotation.z += Math.max(-0.4, Math.min(0.4, Math.atan2(local.y - 0.2, Math.hypot(local.x, local.z)))) * 0.45;
+        head.updateWorldMatrix(true, false);
+        head.worldToLocal(gazeAt.copy(p.gaze));
+        gx = Math.max(-1, Math.min(1, Math.atan2(gazeAt.z, gazeAt.x) / 0.5)) * 0.02;
+        gy = Math.max(-1, Math.min(1, Math.atan2(gazeAt.y, Math.hypot(gazeAt.x, gazeAt.z)) / 0.4)) * 0.014;
+      }
+      for (const e of eyes) { e.scale.set(1, (1 - 0.9 * lid) * (1 - squint) * (1 + 0.3 * F.wide), 1 + 0.12 * F.wide); e.position.z = (e.position.z > 0 ? 0.082 : -0.082) + gx; e.position.y = 0.012 + gy - 0.024 * lid; e.children[1].visible = e.children[2].visible = lid < 0.5; }
+      const blushA = p.blush ?? F.blush;
+      for (const c of blushes) (c.material as THREE.MeshBasicMaterial).opacity = Math.min(1, blushA * (0.7 + 0.3 * (1 + breath) / 2) + 0.35 * joy);
 
       // Follow-through: braids hang with gravity and trail the walk; the feather bounces.
       const lean = spine.rotation.z + neck.rotation.z + head.rotation.z, roll = pelvis.rotation.x + spine.rotation.x + neck.rotation.x + head.rotation.x;
       braids.forEach((g, i) => {
         const k2 = i % 3, first = k2 === 0;
-        g.rotation.set(first ? -roll : Math.sin(w - 1 - k2 * 0.5) * st * 0.12, 0, first ? -lean + Math.sin(w * 2 - 1.1) * st * 0.18 + Math.sin(t * 1.2 + seed + i) * 0.03 * life : -Math.sin(w * 2 - 1.6 - k2 * 0.5) * st * 0.2);
+        g.rotation.set(first ? -roll : Math.sin(w - 1 - k2 * 0.5) * st * 0.12, 0, (i < 3 ? 1 : -1) * yawD[k2 ? 1 : 0] * 1.6 + (first ? -lean + Math.sin(w * 2 - 1.1) * st * 0.18 + Math.sin(t * 1.2 + seed + i) * 0.03 * life : -Math.sin(w * 2 - 1.6 - k2 * 0.5) * st * 0.2));
       });
+      ponytail.forEach((g, k) => g.rotation.set(yawD[k ? 1 : 0] * 1.8, 0, [-0.55, 0.3, 0.25][k] - bowD[k ? 1 : 0] * 1.2 - Math.sin(w * 2 - 1.3 - k * 0.6) * st * 0.22 + Math.sin(t * 1.4 + seed + k) * 0.04 * life));
+      scarfTails.forEach((g, k) => g.rotation.set(yawD[k] * 1.4, 0, -0.12 - bowD[k] * 1.1 - Math.sin(w * 2 - 1.2 - k * 0.6) * st * 0.35 + Math.sin(t * 1.7 + seed + k) * 0.05 * life));
       if (feather) feather.rotation.set(0, 0, Math.sin(w * 2 - 0.8) * st * 0.25 + Math.sin(t * 2.1 + seed) * 0.05 * life);
 
+      const gape = Math.max(open, joy * 0.6);
+      mouth.visible = open < 0.5;
       mouth.scale.set(1, Math.sign(mood || 1) * (0.5 + 0.5 * Math.abs(mood)), 1 + 0.18 * joy - 0.15 * Math.max(0, -mood));
-      grin.visible = joy > 0.01;
-      grin.scale.set(1, joy, (0.4 + 0.6 * joy) * (1 + 0.18 * joy));
-      brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * 0.5 * Math.max(0, -mood); br.position.y = 0.072 + 0.012 * Math.abs(mood); });
+      grin.visible = gape > 0.01;
+      grin.position.y = -0.089 + 0.014 * open;
+      grin.scale.set(1 + open, gape * (1 + open * 0.9), (0.4 + 0.6 * joy) * (1 + 0.18 * joy) * (1 + 0.9 * open));
+      const anger = Math.max(0, -brow), worry = 0.5 * Math.max(0, -mood) * (1 - anger) + 0.25 * Math.max(0, brow) * Math.max(0, -mood);
+      brows.forEach((br, i) => { br.rotation.x = (i ? 1 : -1) * (worry - 0.6 * anger); br.position.y = 0.072 + 0.012 * Math.abs(mood) + 0.03 * Math.max(0, brow) - 0.014 * anger; });
     },
   };
+  return self;
 }
 
 /** `blink` closes the eyes (a slow blink is a cat's hello), `paw` lifts the right forepaw in a wave, `tilt` rolls the head. */

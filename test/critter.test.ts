@@ -35,4 +35,22 @@ describe('critter', () => {
     c.pose({ p: new THREE.Vector3(), t, expr: 'open' });
     expect(tex!.offset.x).toBeCloseTo(EXPRESSIONS.indexOf('sleep') / EXPRESSIONS.length, 9);
   });
+
+  it('arms are jointed: the forearm lags the upper arm, bends at the elbow and the hands stay where a hand should', () => {
+    const c = new Critter('pip', 0x2288ff, 1), p = { p: new THREE.Vector3(), expr: 'open' as const, arms: 0.8 };
+    type Rig = { armL: THREE.Group; armR: THREE.Group; elbowL: THREE.Group; elbowR: THREE.Group };
+    const r = c as unknown as Rig;
+    expect(r.elbowL.parent).toBe(r.armL);
+    const up = Array.from({ length: 60 }, (_, i) => { c.pose({ ...p, t: i * 0.05 }); return [r.armR.rotation.z, r.elbowR.rotation.z]; });
+    const swing = (k: number) => Math.max(...up.map((v) => v[k])) - Math.min(...up.map((v) => v[k]));
+    expect(swing(1)).toBeGreaterThan(0.05);
+    const first = (k: number) => up.findIndex((v, i) => i && (v[k] - up[i - 1][k]) * (up[1][k] - up[0][k]) < 0);
+    expect(first(1)).not.toBe(first(0));
+    c.pose({ ...p, t: 1, arms: 0.15 });
+    c.root.updateMatrixWorld(true);
+    const hand = new THREE.Vector3().setFromMatrixPosition(r.elbowL.children[r.elbowL.children.length - 1].matrixWorld);
+    expect(hand.y).toBeLessThan(0.16);
+    expect(Math.abs(hand.x)).toBeGreaterThan(0.3);
+    expect(r.elbowL.rotation.z * r.elbowR.rotation.z).toBeLessThan(0);
+  });
 });
