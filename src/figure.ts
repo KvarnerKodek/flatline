@@ -174,7 +174,7 @@ export function figure(o: FigureOpts = {}): Figure {
     el.position.y = -ARM_U;
     wr.position.y = -ARM_F;
     spine.add(sh); sh.add(el); el.add(wr);
-    part(sh, new THREE.SphereGeometry(dirndl ? 0.1 : 0.074, 12, 10).scale(1, 0.95, 1), sleeve);
+    part(sh, new THREE.SphereGeometry(dirndl ? 0.088 : 0.074, 14, 10).scale(1, dirndl ? 1.1 : 0.95, 1), sleeve);
     part(sh, new THREE.CapsuleGeometry(0.066, ARM_U - 0.04, 3, 10).translate(0, -ARM_U / 2, 0), sleeve);
     part(el, new THREE.SphereGeometry(0.06, 10, 8), sleeve);
     part(el, new THREE.CapsuleGeometry(0.058, ARM_F - 0.06, 3, 10).translate(0, -ARM_F / 2, 0), sleeve);
