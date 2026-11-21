@@ -24,9 +24,15 @@ export interface EdgeOpts {
   foliage?: number;
   /** keep the inverted-hull outlines as well */
   hulls?: boolean;
+  /** contact shadow in creases and under overhangs, 0 off to 1 strong */
+  ao?: number;
+  /** reach of the contact shadow in metres */
+  aoRadius?: number;
+  /** 0 uniform lines, 1 thick close up and fine far away */
+  taper?: number;
 }
 
-export const DEFAULT_EDGES: Required<EdgeOpts> = { strength: 0.85, thickness: 1.1, depth: 0.04, normal: 0.55, fade: [260, 1500], foliage: 0.5, hulls: false };
+export const DEFAULT_EDGES: Required<EdgeOpts> = { strength: 0.85, thickness: 1.1, depth: 0.04, normal: 0.55, fade: [260, 1500], foliage: 0.5, hulls: false, ao: 0.4, aoRadius: 1.4, taper: 0.7 };
 
 /**
  * The material whose settings a mesh is drawn with in the depth pass, or nothing if it stays out (see-through or
@@ -43,6 +49,8 @@ export const resolveEdges = (o: EdgeOpts = {}): Required<EdgeOpts> => ({ ...DEFA
 export const edgePx = (thickness: number, heightPx: number) => (thickness * heightPx) / 720;
 /** Line weight from a relative inverse-depth jump: 0 below `k`, 1 at `2k`. */
 export const edgeWeight = (jump: number, k: number) => { const t = Math.min(1, Math.max(0, (jump - k) / k)); return t * t * (3 - 2 * t); };
+/** Line width multiplier at view depth `z`: 1 + 0.6 `taper` nearby, 1 - 0.5 `taper` far away. */
+export const edgeTaper = (z: number, taper: number) => { const t = Math.min(1, Math.max(0, (z - 20) / 380)); return 1 + taper * (0.6 - 1.1 * t * t * (3 - 2 * t)); };
 /** 1 inside `near`, 0 beyond `far`. */
 export const distanceFade = (z: number, [near, far]: [number, number]) => { const t = Math.min(1, Math.max(0, (z - near) / (far - near))); return 1 - t * t * (3 - 2 * t); };
 
@@ -108,17 +116,19 @@ const EDGE = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null }, tData: { value: null as THREE.Texture | null }, tVeil: { value: null as THREE.Texture | null },
     uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) }, uPx: { value: 1.1 }, uStrength: { value: 0.85 }, uDepthK: { value: 0.04 }, uNormK: { value: 0.55 },
-    uFade: { value: new THREE.Vector2(260, 1500) }, uFol: { value: 0.5 }, uEdges: { value: 1 },
+    uFade: { value: new THREE.Vector2(260, 1500) }, uFol: { value: 0.5 }, uEdges: { value: 1 }, uAO: { value: 0.4 }, uAOR: { value: 1.4 }, uTaper: { value: 0.7 },
     uTan: { value: new THREE.Vector2(1, 1) }, uCamW: { value: new THREE.Matrix4() },
     uInk: { value: INK }, uFog: G.uFog, uNight: G.uNight,
     ...H,
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse, tData, tVeil; uniform vec2 uTexel, uFade, uTan, uHazeR; uniform float uPx, uStrength, uDepthK, uNormK, uFol, uEdges, uNight, uHazeK, uHazeMix, uNearSat, uFogTop, uFogK, uFogFall;
+    uniform sampler2D tDiffuse, tData, tVeil; uniform vec2 uTexel, uFade, uTan, uHazeR; uniform float uPx, uStrength, uDepthK, uNormK, uFol, uEdges, uNight, uAO, uAOR, uTaper, uHazeK, uHazeMix, uNearSat, uFogTop, uFogK, uFogFall;
     uniform vec3 uInk, uFog, uHazeTint; uniform mat4 uCamW; varying vec2 vUv;
     vec3 nrm(vec4 d){ return vec3(d.xy, sqrt(max(0., 1.-dot(d.xy,d.xy)))); }
     float inv(vec4 d){ return d.w > 0. ? 1./d.w : 0.; }
+    float cr(vec3 nc, vec4 s, float ic){ return (1.-dot(nc, nrm(s)))*(1.-smoothstep(uDepthK, 2.*uDepthK, abs(inv(s)-ic)/ic)); }
+    vec3 viewPos(vec2 uv, float z){ return vec3((uv*2.-1.)*uTan*z, -z); }
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
       vec4 c = texture2D(tData, vUv);
@@ -133,25 +143,36 @@ const EDGE = {
       float hz = uHazeK*smoothstep(uHazeR.x, uHazeR.y, z);
       float gf = uFogK*(1.-smoothstep(uFogTop-uFogFall, uFogTop, wp.y))*(1.-exp(-z*.004));
       col = mix(col, hc, clamp(hz+gf, 0., .92)*(1.-veil));
+      vec3 nc = nrm(c);
+      if (uAO > 0. && z < 420.) {
+        vec3 pc = viewPos(vUv, z);
+        float rp = clamp(uAOR/(2.*z*uTan.y)/uTexel.y, 2., 36.), occ = 0.;
+        for (int i=0;i<8;i++){
+          float a = float(i)*2.39996, k = float(i+1)/8.;
+          vec2 uv = vUv + vec2(cos(a), sin(a))*rp*(.3+.7*k)*uTexel;
+          float zs = texture2D(tData, uv).w;
+          if (zs <= 0.) continue;
+          vec3 v = viewPos(uv, zs) - pc; float dl = length(v);
+          occ += max(0., dot(nc, v/dl) - .2)*(1.-smoothstep(uAOR, 2.2*uAOR, dl));
+        }
+        occ = smoothstep(.0, .55, occ/4.)*(1.-smoothstep(80., 420., z))*uAO;
+        col *= 1. - occ*(1.-vec3(.66,.7,.92)*.9);
+      }
       if (uEdges > 0.) {
-        vec2 o = uTexel*uPx;
+        vec2 o = uTexel*uPx*(1.+uTaper*(.6-1.1*smoothstep(20.,400.,z)));
         vec4 l = texture2D(tData, vUv-vec2(o.x,0.)), r = texture2D(tData, vUv+vec2(o.x,0.)), d = texture2D(tData, vUv-vec2(0.,o.y)), u = texture2D(tData, vUv+vec2(0.,o.y));
         float ic = 1./z;
         float jump = max(max(0., 2.*ic-inv(l)-inv(r)), max(0., 2.*ic-inv(d)-inv(u)))/ic;
         float w = smoothstep(uDepthK, 2.*uDepthK, jump);
-        vec3 nc = nrm(c);
-        float crease = 0.;
-        crease = max(crease, (1.-dot(nc, nrm(l)))*step(abs(inv(l)-ic), ic*uDepthK));
-        crease = max(crease, (1.-dot(nc, nrm(r)))*step(abs(inv(r)-ic), ic*uDepthK));
-        crease = max(crease, (1.-dot(nc, nrm(d)))*step(abs(inv(d)-ic), ic*uDepthK));
-        crease = max(crease, (1.-dot(nc, nrm(u)))*step(abs(inv(u)-ic), ic*uDepthK));
+        float crease = max(max(cr(nc, l, ic), cr(nc, r, ic)), max(cr(nc, d, ic), cr(nc, u, ic)));
         w = max(w, .7*smoothstep(uNormK, 2.*uNormK, crease));
         float thin = max(step(inv(l), ic*(1.-uDepthK))*step(inv(r), ic*(1.-uDepthK)), step(inv(d), ic*(1.-uDepthK))*step(inv(u), ic*(1.-uDepthK)));
         w *= (1.-.45*thin)*mix(1., uFol, c.z);
         float t = clamp((z-uFade.x)/(uFade.y-uFade.x), 0., 1.);
         w *= (1.-t*t*(3.-2.*t))*uStrength;
         vec3 ink = mix(uInk*vec3(1.5,1.2,1.)+vec3(.05,.03,.02), uInk*vec3(.9,1.1,1.8), uNight);
-        ink = mix(col*.38, ink, .55);
+        ink = mix(col*col*.5, ink, .5);
+        ink = mix(ink, hc*.8, hz*.8);
         col = mix(col, ink, w*(1.-veil));
       }
       gl_FragColor = vec4(col, 1.);
@@ -239,7 +260,7 @@ export class EdgePass extends Pass {
     const u = this.mat.uniforms, cam = this.camera;
     u.uTan.value.set(Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * cam.aspect, Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
     u.uCamW.value.copy(cam.matrixWorld);
-    u.uStrength.value = this.opts.strength; u.uDepthK.value = this.opts.depth; u.uNormK.value = this.opts.normal; u.uFade.value.set(...this.opts.fade); u.uFol.value = this.opts.foliage; u.uEdges.value = this.lines ? 1 : 0;
+    u.uAO.value = this.opts.ao; u.uAOR.value = this.opts.aoRadius; u.uTaper.value = this.opts.taper; u.uStrength.value = this.opts.strength; u.uDepthK.value = this.opts.depth; u.uNormK.value = this.opts.normal; u.uFade.value.set(...this.opts.fade); u.uFol.value = this.opts.foliage; u.uEdges.value = this.lines ? 1 : 0;
 
     for (const s of this.swaps) {
       const m = depthSource(s.mat)!, def = (m as THREE.ShaderMaterial).defines;

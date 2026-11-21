@@ -44,6 +44,25 @@ float fbm(vec2 p){ float a=.5,s=0.; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=p*2.
 vec3 applyFog(vec3 c, float d){ float f = 1.-exp(-pow(d*uFogD,1.35)); return mix(c, uFog, clamp(f,0.,1.)); }
 `;
 
+/**
+ * Shared sun-shadow filter: a 3-texel box tap set filtered bilinearly, with the receiver-plane depth gradient
+ * (`planeGrad`, needs uniform control flow) applied per tap so slanted ground never shows acne stripes.
+ */
+export const SHADOW_FILTER_GLSL = /* glsl */ `
+vec2 planeGrad(vec3 p){
+  vec3 dx = dFdx(p), dy = dFdy(p); float det = dx.x*dy.y - dx.y*dy.x;
+  return abs(det) < 1e-14 ? vec2(0.) : clamp(vec2(dx.z*dy.y - dy.z*dx.y, dy.z*dx.x - dx.z*dy.x)/det, -2., 2.);
+}
+float shadowLookup(sampler2D map, vec4 at, float nl, float scale, vec2 grad){
+  vec3 p = at.xyz/at.w*.5+.5;
+  float bias = (.00004 + .00022*(1.-clamp(abs(nl), 0., 1.)))*scale, s = 0.;
+  vec2 t = p.xy/uShadowTexel - .5, b = floor(t), f = t - b;
+  vec4 wx = vec4(1.-f.x, 1., 1., f.x), wy = vec4(1.-f.y, 1., 1., f.y);
+  for (int i=0;i<4;i++) for (int j=0;j<4;j++) { vec2 c = (b + vec2(float(i)-.5, float(j)-.5))*uShadowTexel; s += wx[i]*wy[j]*step(texture2D(map, c).r + bias, p.z + dot(grad, c - p.xy)); }
+  return smoothstep(.2, .8, s/9.);
+}
+`;
+
 const TOON_VS = /* glsl */ `
 varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
 uniform mat4 uShadowMat, uShadowMatN;
@@ -73,21 +92,19 @@ ${COMMON}
 varying vec3 vN; varying vec3 vW; varying vec3 vC; varying vec4 vS; varying vec4 vSN;
 uniform vec3 uBase; uniform float uVC, uEmis, uSpec, uAlpha, uEmisN, uGrain, uShadowOn;
 uniform vec3 uEmisCol; uniform sampler2D uShadowMap, uShadowMapN; uniform float uShadowTexel;
-float lookup(sampler2D map, vec4 at, float nl, float scale){
-  vec3 p = at.xyz/at.w*.5+.5;
-  float bias = (.00004 + .00022*(1.-clamp(abs(nl), 0., 1.)))*scale, s = 0.;
-  for (int i=-1;i<=1;i++) for (int j=-1;j<=1;j++) s += step(texture2D(map, p.xy + vec2(float(i), float(j))*uShadowTexel*1.25).r + bias, p.z);
-  return smoothstep(.2, .8, s/9.);
-}
+${SHADOW_FILTER_GLSL}
+vec2 gradF, gradN;
 float sunShadow(float nl){
   if (uShadowOn < .5) return 0.;
   vec3 n = vSN.xyz/vSN.w*.5+.5, f = vS.xyz/vS.w*.5+.5;
   float inNear = smoothstep(0., .06, min(min(n.x, 1.-n.x), min(n.y, 1.-n.y)));
+  if (inNear >= 1.) return shadowLookup(uShadowMapN, vSN, nl, .25, gradN);
   float edge = smoothstep(0., .05, min(min(f.x, 1.-f.x), min(f.y, 1.-f.y)));
-  float far = f.z > 1. ? 0. : lookup(uShadowMap, vS, nl, 1.)*edge;
-  return inNear > 0. ? mix(far, lookup(uShadowMapN, vSN, nl, .25), inNear) : far;
+  float far = f.z > 1. ? 0. : shadowLookup(uShadowMap, vS, nl, 1., gradF)*edge;
+  return inNear > 0. ? mix(far, shadowLookup(uShadowMapN, vSN, nl, .25, gradN), inNear) : far;
 }
 void main(){
+  gradF = planeGrad(vS.xyz/vS.w*.5+.5); gradN = planeGrad(vSN.xyz/vSN.w*.5+.5);
   vec3 base = mix(uBase, vC, uVC);
   if (uPaint > 0.) {
     float dc = length(cameraPosition - vW), fadeP = 1.-smoothstep(120.,520.,dc);
@@ -113,8 +130,8 @@ void main(){
   float wl = smoothstep(-.2,1.1,vW.y);
   col *= mix(1., mix(.72, 1., wl), uWaterline);
   col = mix(col, col*vec3(1.04,1.0,.94), b2*.6);
-  float rim = pow(1.-max(dot(n,v),0.),3.);
-  col += uRim*smoothstep(.46-sf,.52+sf,rim)*(.3+.7*hemi)*mix(.38,.75,uNight)*uRimK;
+  float rim = pow(max(1.-dot(n,v),0.),3.);
+  col += uRim*smoothstep(.46-sf,.52+sf,rim)*(.3+.7*hemi)*mix(.38,.75,uNight)*uRimK*mix(.45,1.,smoothstep(.3,-.3,nl));
   col += base*vec3(.95,.78,.45)*(1.-hemi)*.08*min(uSoft,1.)*(1.-uNight);
   vec3 h = normalize(uLightDir+v);
   col += uLightCol*step(.55,pow(max(dot(n,h),0.),70.))*uSpec*uSpecK;

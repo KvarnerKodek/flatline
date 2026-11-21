@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { G } from './toon';
+import { G, SHADOW_FILTER_GLSL } from './toon';
 
 /** Meshes on this layer are drawn into the shadow map. `castShadows` puts them there. */
 export const SHADOW_LAYER = 2;
@@ -7,21 +7,18 @@ export const SHADOW_LAYER = 2;
 /** Receiver for custom shaders: `sunShadow(wp, n, nl)` is 0 lit to 1 shadowed, `sunShadowCover(wp)` is 1 inside the shadow maps. Same maps and taps as `toon()`. */
 export const SHADOW_GLSL = /* glsl */ `
 uniform sampler2D uShadowMap, uShadowMapN; uniform mat4 uShadowMat, uShadowMatN; uniform float uShadowOn, uShadowTexel;
-float shadowLookup(sampler2D map, vec4 at, float nl, float scale){
-  vec3 p = at.xyz/at.w*.5+.5;
-  float bias = (.00004 + .00022*(1.-clamp(abs(nl), 0., 1.)))*scale, s = 0.;
-  for (int i=-1;i<=1;i++) for (int j=-1;j<=1;j++) s += step(texture2D(map, p.xy + vec2(float(i), float(j))*uShadowTexel*1.25).r + bias, p.z);
-  return smoothstep(.2, .8, s/9.);
-}
+${SHADOW_FILTER_GLSL}
 float shadowEdge(vec4 at){ vec3 f = at.xyz/at.w*.5+.5; return smoothstep(0., .05, min(min(f.x, 1.-f.x), min(f.y, 1.-f.y))); }
 float sunShadowCover(vec3 wp){ return uShadowOn < .5 ? 0. : shadowEdge(uShadowMat*vec4(wp,1.)); }
 float sunShadow(vec3 wp, vec3 nrm, float nl){
   if (uShadowOn < .5) return 0.;
   vec4 vS = uShadowMat*vec4(wp + nrm*.16, 1.), vSN = uShadowMatN*vec4(wp + nrm*.05, 1.);
   vec3 n = vSN.xyz/vSN.w*.5+.5, f = vS.xyz/vS.w*.5+.5;
+  vec2 gF = planeGrad(f), gN = planeGrad(n);
   float inNear = smoothstep(0., .06, min(min(n.x, 1.-n.x), min(n.y, 1.-n.y)));
-  float far = f.z > 1. ? 0. : shadowLookup(uShadowMap, vS, nl, 1.)*shadowEdge(vS);
-  return inNear > 0. ? mix(far, shadowLookup(uShadowMapN, vSN, nl, .25), inNear) : far;
+  if (inNear >= 1.) return shadowLookup(uShadowMapN, vSN, nl, .25, gN);
+  float far = f.z > 1. ? 0. : shadowLookup(uShadowMap, vS, nl, 1., gF)*shadowEdge(vS);
+  return inNear > 0. ? mix(far, shadowLookup(uShadowMapN, vSN, nl, .25, gN), inNear) : far;
 }
 `;
 
@@ -88,10 +85,12 @@ export class SunShadow {
   }
 
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
-    const before = scene.overrideMaterial;
+    const before = scene.overrideMaterial, sorted = renderer.sortObjects;
     scene.overrideMaterial = this.depth;
+    renderer.sortObjects = false;
     this.far.render(renderer, scene);
     this.near.render(renderer, scene);
+    renderer.sortObjects = sorted;
     renderer.setRenderTarget(null);
     scene.overrideMaterial = before;
     G.uShadowMap.value = this.far.target.depthTexture;
