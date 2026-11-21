@@ -89,7 +89,7 @@ let figureSeed = 0;
 
 /** Lathe a soft garment: `profile` is [radius, y] from top to hem; the hem ripples into `folds` soft pleats. */
 function garment(profile: [number, number][], folds: number, depth: number, start = 0, length = Math.PI * 2): THREE.BufferGeometry {
-  const pts = profile.map(([r, y]) => new THREE.Vector2(r, y)).reverse(), g = new THREE.LatheGeometry(pts, 40, start, length);
+  const pts = profile.flatMap(([r, y], i) => i ? [1, 2, 3, 4].map((k) => new THREE.Vector2(profile[i - 1][0] + (r - profile[i - 1][0]) * k / 4, profile[i - 1][1] + (y - profile[i - 1][1]) * k / 4)) : [new THREE.Vector2(r, y)]).reverse(), g = new THREE.LatheGeometry(pts, 40, start, length);
   const pos = g.getAttribute('position'), v = new THREE.Vector3(), top = profile[0][1], bot = profile[profile.length - 1][1];
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
@@ -260,6 +260,17 @@ export function figure(o: FigureOpts = {}): Figure {
     part(head, new THREE.CylinderGeometry(0.44, 0.46, 0.035, 20), o.hat, 0, 0.15, 0);
     part(head, new THREE.CylinderGeometry(0.17, 0.21, 0.17, 16), o.hat, 0, 0.24, 0);
   }
+  root.updateMatrixWorld(true);
+  let hipR = 0;
+  const at = new THREE.Vector3();
+  pelvis.traverse((m) => {
+    const g = (m as THREE.Mesh).geometry;
+    if (!g || arms.some((a) => isIn(m, a.sh))) return;
+    const pos = g.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) { at.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); if (at.y > 0.78 && at.y < 1.02) hipR = Math.max(hipR, Math.hypot(at.x, at.z)); }
+  });
+  /** How far a lowered arm swings out (beyond the usual slight tuck) so the hand hangs clear of the hips, coat or skirt. */
+  const hang = Math.max(Math.asin(Math.min(1, (hipR + 0.045 - 0.25 * b) / 0.5)), -0.06) + 0.06;
   sealRig(root);
 
   const inv = new THREE.Matrix4(), basis = new THREE.Matrix4(), d = new THREE.Vector3(), perp = new THREE.Vector3(), upper = new THREE.Vector3();
@@ -388,10 +399,11 @@ export function figure(o: FigureOpts = {}): Figure {
         a.thumb.rotation.set(a.s * 0.35, 0, (face ? -0.1 : 0.45) + curl * 0.6);
         if (mixK >= 1) { reachTo(a, grip!, face); return; }
         a.sh.rotation.set(R ? reach : -reach, 0, armA + counter + breath * 0.02 * life);
-        a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA) - (dress ? 0.3 * (1 - Math.min(1, Math.max(0, armA))) : 0));
+        const low = 1 - Math.min(1, Math.max(0, armA));
+        a.sh.rotation.x += a.s * (0.06 + 0.04 * Math.min(1, armA) - hang * low);
         const elbow = (R ? p.elbowR : p.elbowL) ?? (0.18 + 0.32 * Math.min(1, Math.max(0, armA) / 2.2) + Math.max(0, Math.sin(ph(i))) * st * 0.5 + 0.03 * Math.sin(t * 0.9 + seed + i) * life);
         a.el.rotation.set(0, 0, elbow);
-        a.wr.rotation.set(0, 0, -0.1 - elbow * 0.15);
+        a.wr.rotation.set(0, a.s * 1.4 * low, -0.1 - elbow * 0.15);
         if (mixK > 0) { a.palm.updateWorldMatrix(true, false); reachTo(a, mixAt.setFromMatrixPosition(a.palm.matrixWorld).lerp(grip!, mixK), face, mixK); }
       });
 

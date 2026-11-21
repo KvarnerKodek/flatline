@@ -81,19 +81,24 @@ describe('figure rig', () => {
     }
   });
 
-  it('hangs a skirted figure\'s relaxed hands outside the skirt, never inside it', () => {
-    const f = figure({ outfit: 'dirndl', apron: 0xffffff }), v = new THREE.Vector3(), skirt = f.joints.pelvis.userData.skirt as THREE.Group;
-    for (const t of [0, 1.3, 2.9, 4.4]) {
-      f.pose({ t });
-      f.root.updateMatrixWorld(true);
-      const rows = new Map<number, number>();
-      skirt.traverse((c) => { const m = c as THREE.Mesh; if (!m.isMesh) return; const p = m.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); const k = Math.round(v.y * 200); rows.set(k, Math.max(rows.get(k) ?? 0, Math.hypot(v.x, v.z))); } });
-      const ys = [...rows.keys()].sort((a, b) => a - b), bell = (y: number) => { const k = y * 200, j = ys.findIndex((q) => q >= k); if (j <= 0) return 0; const u = (k - ys[j - 1]) / (ys[j] - ys[j - 1]); return rows.get(ys[j - 1])! + (rows.get(ys[j])! - rows.get(ys[j - 1])!) * u; };
-      let gap = Infinity;
-      for (const a of f.joints.arms) a.wr.traverse((c) => { const m = c as THREE.Mesh; if (!m.isMesh) return; const p = m.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); gap = Math.min(gap, Math.hypot(v.x, v.z) - bell(v.y)); } });
-      expect(gap).toBeGreaterThan(0);
-    }
-  });
+  for (const o of [{ outfit: 'dirndl', apron: 0xffffff }, { outfit: 'lederhosen', build: 1.28 }, { build: 1.2, apron: 0xffffff }, { dress: true }] as const) {
+    it(`${o.outfit ?? (('dress' in o) ? 'dress' : 'coat')}: relaxed hands hang clear of the hips, coat or skirt, never inside them`, () => {
+      const f = figure(o), v = new THREE.Vector3(), { pelvis, spine } = f.joints, skirt = pelvis.userData.skirt as THREE.Group | undefined;
+      for (const t of [0, 1.3, 2.9, 4.4]) {
+        f.pose({ t });
+        f.root.updateMatrixWorld(true);
+        const shells = [pelvis, spine, skirt].flatMap((g) => g ? g.children.filter((c) => (c as THREE.Mesh).isMesh && !((c as THREE.Mesh).material as THREE.Material).side) as THREE.Mesh[] : []).map((m) => {
+          const rows = new Map<number, number>(), p = m.geometry.getAttribute('position');
+          for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); const k = Math.round(v.y * 200); rows.set(k, Math.max(rows.get(k) ?? 0, Math.hypot(v.x, v.z))); }
+          const ys = [...rows.keys()].sort((a, b) => a - b);
+          return (y: number) => { const k = y * 200, j = ys.findIndex((q) => q >= k); if (j <= 0) return 0; const u = (k - ys[j - 1]) / (ys[j] - ys[j - 1]); return rows.get(ys[j - 1])! + (rows.get(ys[j])! - rows.get(ys[j - 1])!) * u; };
+        });
+        let gap = Infinity;
+        for (const a of f.joints.arms) a.wr.traverse((c) => { const m = c as THREE.Mesh; if (!m.isMesh) return; const p = m.geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); for (const r of shells) gap = Math.min(gap, Math.hypot(v.x, v.z) - r(v.y)); } });
+        expect(gap).toBeGreaterThan(0);
+      }
+    });
+  }
 
   it('eases a hand from its own pose onto a grip, continuously, with no jump at either end', () => {
     const f = figure();
